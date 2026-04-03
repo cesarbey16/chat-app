@@ -163,12 +163,20 @@ socket.on("stop-screen",()=>videos.innerHTML="");
 socket.on("offer",async offer=>{
   peer=new RTCPeerConnection();
 
-  peer.ontrack=e=>{
-    const v=document.createElement("video");
-    v.srcObject=e.streams[0];
-    v.autoplay=true;
-    videos.appendChild(v);
+  peer.ontrack = e => {
+  const v = document.createElement("video");
+  v.srcObject = e.streams[0];
+  v.autoplay = true;
+  v.controls = true;
+
+  v.onclick = () => {
+    if (v.requestFullscreen) {
+      v.requestFullscreen();
+    }
   };
+
+  videos.appendChild(v);
+};
 
   peer.onicecandidate=e=>{
     if(e.candidate) socket.emit("ice-candidate",e.candidate);
