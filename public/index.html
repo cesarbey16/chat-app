@@ -122,7 +122,10 @@ socket.on("stop-typing",()=>typingDiv.innerText="");
 let peer,localStream,localVideo;
 
 async function startScreen(){
-  localStream=await navigator.mediaDevices.getDisplayMedia({video:true});
+  localStream = await navigator.mediaDevices.getDisplayMedia({
+  video: true,
+  audio: true // 🔥 EKLE
+});
 
   localVideo=document.createElement("video");
   localVideo.srcObject=localStream;
