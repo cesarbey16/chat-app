@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Chat</title>
+
+<style>
+body{margin:0;display:flex;height:100vh;font-family:sans-serif;background:#0b141a}
+#sidebar{width:25%;background:#111b21;color:#fff;padding:10px}
+#chat{flex:1;display:flex;flex-direction:column}
+#messages{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column}
+
+.msg{max-width:60%;padding:10px;margin:5px;border-radius:10px}
+.me{background:#005c4b;align-self:flex-end}
+.other{background:#202c33}
+
+#input{display:flex;padding:10px;background:#202c33}
+#msg{flex:1;padding:10px}
+button{margin-left:10px;padding:10px;background:#25D366;color:white;border:none}
+
+.user{margin:5px 0}
+.room{margin:5px 0;cursor:pointer}
+.online{width:8px;height:8px;background:lime;border-radius:50%;display:inline-block;margin-left:5px}
+
+video{width:200px;border-radius:10px;margin:5px}
+</style>
+</head>
+
+<body>
+
+<div id="sidebar">
+<h3>Odalar</h3>
+<div id="rooms"></div>
+
+<h4>Aktif</h4>
+<div id="users"></div>
+
+<button onclick="startScreen()">📺 Paylaş</button>
+</div>
+
+<div id="chat">
+<div id="messages"></div>
+<div id="typing"></div>
+<div id="videos"></div>
+
+<div id="input">
+<input id="msg">
+<button onclick="send()">Gönder</button>
+</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket=io();
+
+const msgInput=document.getElementById("msg");
+const messages=document.getElementById("messages");
+const usersDiv=document.getElementById("users");
+const roomsDiv=document.getElementById("rooms");
+const typingDiv=document.getElementById("typing");
+const videos=document.getElementById("videos");
+
+let username=prompt("İsim");
+let room=prompt("Oda");
+let password=prompt("Şifre");
+
+socket.emit("join-room",{username,room,password});
+
+/* MESAJ GÖNDER */
+function send(){
+  const msg=msgInput.value;
+  if(!msg) return;
+
+  socket.emit("message",msg);
+  msgInput.value="";
+}
+
+/* TEK NOKTADAN MESAJ BAS (ÇİFT YOK) */
+socket.on("message",(d)=>{
+  const isMe = d.username === username;
+
+  messages.innerHTML += `
+    <div class="msg ${isMe ? "me" : "other"}">
+      ${!isMe ? "<b>"+d.username+"</b><br>" : ""}
+      ${d.msg} ${isMe ? "✔✔" : ""}
+    </div>
+  `;
+});
+
+/* KULLANICILAR */
+socket.on("user-list",(rooms)=>{
+  usersDiv.innerHTML="";
+
+  Object.keys(rooms).forEach(r=>{
+    usersDiv.innerHTML += `<b>${r}</b><br>`;
+    rooms[r].forEach(u=>{
+      usersDiv.innerHTML += `${u.username} <span class="online"></span><br>`;
+    });
+  });
+});
+
+/* ODALAR */
+socket.on("room-list",(rooms)=>{
+  roomsDiv.innerHTML="";
+  rooms.forEach(r=>{
+    roomsDiv.innerHTML += `<div class="room">${r}</div>`;
+  });
+});
+
+/* YAZIYOR */
+let t;
+msgInput.oninput=()=>{
+  socket.emit("typing");
+  clearTimeout(t);
+  t=setTimeout(()=>socket.emit("stop-typing"),1000);
+};
+
+socket.on("typing",u=>typingDiv.innerText=u+" yazıyor...");
+socket.on("stop-typing",()=>typingDiv.innerText="");
+
+/* EKRAN PAYLAŞIM */
+let peer,localStream,localVideo;
+
+async function startScreen(){
+  localStream=await navigator.mediaDevices.getDisplayMedia({video:true});
+
+  localVideo=document.createElement("video");
+  localVideo.srcObject=localStream;
+  localVideo.autoplay=true;
+  localVideo.muted=true;
+  videos.appendChild(localVideo);
+
+  peer=new RTCPeerConnection();
+
+  localStream.getTracks().forEach(t=>peer.addTrack(t,localStream));
+
+  peer.onicecandidate=e=>{
+    if(e.candidate) socket.emit("ice-candidate",e.candidate);
+  };
+
+  const offer=await peer.createOffer();
+  await peer.setLocalDescription(offer);
+  socket.emit("offer",offer);
+
+  localStream.getVideoTracks()[0].onended=stopScreen;
+}
+
+function stopScreen(){
+  if(localVideo){localVideo.remove();localVideo=null;}
+  if(localStream){
+    localStream.getTracks().forEach(t=>t.stop());
+    localStream=null;
+  }
+  if(peer){peer.close();peer=null;}
+  socket.emit("stop-screen");
+}
+
+socket.on("stop-screen",()=>videos.innerHTML="");
+
+socket.on("offer",async offer=>{
+  peer=new RTCPeerConnection();
+
+  peer.ontrack=e=>{
+    const v=document.createElement("video");
+    v.srcObject=e.streams[0];
+    v.autoplay=true;
+    videos.appendChild(v);
+  };
+
+  peer.onicecandidate=e=>{
+    if(e.candidate) socket.emit("ice-candidate",e.candidate);
+  };
+
+  await peer.setRemoteDescription(offer);
+  const answer=await peer.createAnswer();
+  await peer.setLocalDescription(answer);
+  socket.emit("answer",answer);
+});
+
+socket.on("answer",a=>peer.setRemoteDescription(a));
+socket.on("ice-candidate",c=>peer.addIceCandidate(c));
+</script>
+
+</body>
+</html>
