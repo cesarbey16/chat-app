@@ -12,7 +12,7 @@ let rooms = {};
 
 io.on("connection", (socket) => {
 
-  // ✅ YENİ GİREN HERKESE ODA LİSTESİ
+  // ✅ Yeni gelen herkese odaları gönder
   socket.emit("room-list", Object.keys(rooms));
   socket.emit("user-list", rooms);
 
@@ -57,22 +57,23 @@ io.on("connection", (socket) => {
 
   // MESAJ + SAAT
   socket.on("message", (msg) => {
-    const room = socket.room;
-    if (!room) return;
+    if (!socket.room) return;
 
     const now = new Date();
-    const time = now.getHours().toString().padStart(2,"0") + ":" +
-                 now.getMinutes().toString().padStart(2,"0");
+    const time =
+      now.getHours().toString().padStart(2, "0") +
+      ":" +
+      now.getMinutes().toString().padStart(2, "0");
 
-    io.to(room).emit("message", {
-      username: getUsername(room, socket.id),
+    io.to(socket.room).emit("message", {
+      username: getUsername(socket.room, socket.id),
       msg,
-      time
+      time,
     });
   });
 
   function getUsername(room, id) {
-    const user = rooms[room]?.users.find(u => u.id === id);
+    const user = rooms[room]?.users.find((u) => u.id === id);
     return user ? user.username : "Bilinmiyor";
   }
 
@@ -85,19 +86,24 @@ io.on("connection", (socket) => {
     socket.to(socket.room).emit("stop-typing");
   });
 
+  // WEBRTC SİNYALLEŞME
+  socket.on("offer", (d) => socket.to(socket.room).emit("offer", d));
+  socket.on("answer", (d) => socket.to(socket.room).emit("answer", d));
+  socket.on("ice-candidate", (d) => socket.to(socket.room).emit("ice-candidate", d));
+  socket.on("stop-screen", () => socket.to(socket.room).emit("stop-screen"));
+
   // ÇIKIŞ
   socket.on("disconnect", () => {
     const room = socket.room;
     if (!room || !rooms[room]) return;
 
-    rooms[room].users = rooms[room].users.filter(u => u.id !== socket.id);
+    rooms[room].users = rooms[room].users.filter((u) => u.id !== socket.id);
 
     if (rooms[room].users.length === 0) delete rooms[room];
 
     io.emit("room-list", Object.keys(rooms));
     io.emit("user-list", rooms);
   });
-
 });
 
 server.listen(3000, () => console.log("Server çalışıyor"));
