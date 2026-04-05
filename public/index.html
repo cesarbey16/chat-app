@@ -2,23 +2,19 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Chat Pro</title>
 
 <style>
 body{margin:0;display:flex;height:100vh;background:#0f172a;color:#fff;font-family:sans-serif}
 
-/* BUTON STYLE */
+/* BUTTON */
 button{
   background:linear-gradient(45deg,#2563eb,#06b6d4);
-  border:none;
-  color:#fff;
-  padding:8px 12px;
-  border-radius:8px;
-  cursor:pointer;
-  transition:0.2s;
+  border:none;color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer
 }
-button:hover{transform:scale(1.05)}
 
+/* MENU */
 #menuBtn{display:none;position:absolute;top:10px;left:10px;z-index:999}
 
 /* SIDEBAR */
@@ -32,18 +28,17 @@ button:hover{transform:scale(1.05)}
 .me{background:#2563eb;align-self:flex-end}
 .other{background:#1e293b}
 
-.time{font-size:11px;color:#94a3b8;text-align:right}
+.time{font-size:11px;color:#94a3b8}
 
 #input{display:flex;padding:10px;background:#020617}
 #msg{flex:1;padding:10px;border:none;border-radius:8px;background:#0f172a;color:#fff}
-#sendBtn{margin-left:10px}
 
 .room{padding:6px;margin:5px 0;background:#0f172a;border-radius:6px;cursor:pointer}
 .online{width:8px;height:8px;background:lime;border-radius:50%;display:inline-block}
 
 video{width:220px;margin:5px;border-radius:10px;background:black}
 
-/* MOBİL */
+/* MOBILE */
 @media(max-width:768px){
   body{flex-direction:column}
   #menuBtn{display:block}
@@ -70,7 +65,6 @@ video{width:220px;margin:5px;border-radius:10px;background:black}
 
 <button onclick="startScreen()">📺 Paylaş</button>
 <button onclick="toggleMic()">🎤 Mic Aç/Kapa</button>
-
 </div>
 
 <div id="chat">
@@ -89,25 +83,17 @@ const socket = io();
 
 let username = prompt("İsim:");
 let currentRoom = "";
-let micEnabled = true;
-
-const msgInput = document.getElementById("msg");
-const messages = document.getElementById("messages");
-const roomsDiv = document.getElementById("rooms");
-const usersDiv = document.getElementById("users");
-const videos = document.getElementById("videos");
+let stream, peer;
 
 /* MENU */
-document.getElementById("menuBtn").onclick=()=>{
-  sidebar.classList.toggle("active");
-};
+menuBtn.onclick=()=>sidebar.classList.toggle("active");
 
 /* ENTER */
-msgInput.addEventListener("keypress",e=>{
+msg.addEventListener("keypress",e=>{
   if(e.key==="Enter") send();
 });
 
-/* ODA */
+/* ROOMS */
 function createRoom(){
   const room=prompt("Oda adı:");
   const password=prompt("Şifre:");
@@ -123,7 +109,6 @@ function joinRoom(room){
   messages.innerHTML="";
 }
 
-/* ROOMS */
 socket.on("room-list",(rooms)=>{
   roomsDiv.innerHTML="";
   rooms.forEach(r=>{
@@ -131,7 +116,6 @@ socket.on("room-list",(rooms)=>{
   });
 });
 
-/* USERS */
 socket.on("user-list",(rooms)=>{
   usersDiv.innerHTML="";
   Object.keys(rooms).forEach(r=>{
@@ -141,12 +125,11 @@ socket.on("user-list",(rooms)=>{
   });
 });
 
-/* MESAJ */
+/* MESSAGE */
 function send(){
-  const msg=msgInput.value;
-  if(!msg)return;
-  socket.emit("message",msg);
-  msgInput.value="";
+  if(!msg.value) return;
+  socket.emit("message",msg.value);
+  msg.value="";
 }
 
 socket.on("message",(d)=>{
@@ -158,18 +141,15 @@ socket.on("message",(d)=>{
   </div>`;
 });
 
-/* MIC CONTROL */
+/* MIC */
 function toggleMic(){
   if(!stream) return;
-  stream.getAudioTracks().forEach(track=>{
-    track.enabled = !track.enabled;
-    micEnabled = track.enabled;
+  stream.getAudioTracks().forEach(t=>{
+    t.enabled=!t.enabled;
   });
 }
 
-/* WEBRTC */
-let peer,stream;
-
+/* PEER */
 function createPeer(){
   return new RTCPeerConnection({
     iceServers:[
@@ -183,14 +163,18 @@ function createPeer(){
   });
 }
 
-/* SCREEN SHARE (GELİŞMİŞ) */
+/* SCREEN */
 async function startScreen(){
 
-  let screen = await navigator.mediaDevices.getDisplayMedia({video:true});
+  let screen = await navigator.mediaDevices.getDisplayMedia({
+    video:true,
+    audio:true
+  });
+
   let mic = await navigator.mediaDevices.getUserMedia({audio:true});
 
   stream = new MediaStream([
-    ...screen.getVideoTracks(),
+    ...screen.getTracks(),
     ...mic.getAudioTracks()
   ]);
 
@@ -211,13 +195,7 @@ async function startScreen(){
     if(e.candidate) socket.emit("ice-candidate",e.candidate);
   };
 
-  peer.onconnectionstatechange=()=>{
-    if(peer.connectionState==="disconnected"){
-      console.log("yeniden bağlanıyor...");
-    }
-  };
-
-  const offer=await peer.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});
+  const offer=await peer.createOffer();
   await peer.setLocalDescription(offer);
   socket.emit("offer",offer);
 
@@ -236,6 +214,8 @@ socket.on("offer",async offer=>{
     v.srcObject=e.streams[0];
     v.autoplay=true;
     v.controls=true;
+    v.muted=false;
+    v.volume=1;
     videos.appendChild(v);
   };
 
