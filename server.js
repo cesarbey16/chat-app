@@ -19,6 +19,10 @@ io.on("connection", (socket) => {
   socket.emit("room-list", Object.keys(rooms));
   socket.emit("user-list", rooms);
 
+  socket.on("get-rooms", () => {
+    socket.emit("room-list", Object.keys(rooms));
+  });
+
   socket.on("create-room", ({ room, password, username }) => {
     if (rooms[room]) return;
 
