@@ -12,18 +12,18 @@ let rooms = {};
 
 io.on("connection", (socket) => {
 
+  // ✅ YENİ GİREN HERKESE ODA LİSTESİ
+  socket.emit("room-list", Object.keys(rooms));
+  socket.emit("user-list", rooms);
+
   // ODA OLUŞTUR
   socket.on("create-room", ({ room, password, username }) => {
-
     if (rooms[room]) {
       socket.emit("error-msg", "Oda zaten var");
       return;
     }
 
-    rooms[room] = {
-      password,
-      users: []
-    };
+    rooms[room] = { password, users: [] };
 
     socket.join(room);
     socket.room = room;
@@ -36,7 +36,6 @@ io.on("connection", (socket) => {
 
   // ODAYA KATIL
   socket.on("join-room", ({ room, password, username }) => {
-
     if (!rooms[room]) {
       socket.emit("error-msg", "Oda yok");
       return;
@@ -56,14 +55,19 @@ io.on("connection", (socket) => {
     io.emit("user-list", rooms);
   });
 
-  // MESAJ
+  // MESAJ + SAAT
   socket.on("message", (msg) => {
     const room = socket.room;
     if (!room) return;
 
+    const now = new Date();
+    const time = now.getHours().toString().padStart(2,"0") + ":" +
+                 now.getMinutes().toString().padStart(2,"0");
+
     io.to(room).emit("message", {
       username: getUsername(room, socket.id),
-      msg
+      msg,
+      time
     });
   });
 
@@ -81,12 +85,6 @@ io.on("connection", (socket) => {
     socket.to(socket.room).emit("stop-typing");
   });
 
-  // EKRAN PAYLAŞIM
-  socket.on("offer",(d)=>socket.to(socket.room).emit("offer",d));
-  socket.on("answer",(d)=>socket.to(socket.room).emit("answer",d));
-  socket.on("ice-candidate",(d)=>socket.to(socket.room).emit("ice-candidate",d));
-  socket.on("stop-screen",()=>socket.to(socket.room).emit("stop-screen"));
-
   // ÇIKIŞ
   socket.on("disconnect", () => {
     const room = socket.room;
@@ -94,9 +92,7 @@ io.on("connection", (socket) => {
 
     rooms[room].users = rooms[room].users.filter(u => u.id !== socket.id);
 
-    if (rooms[room].users.length === 0) {
-      delete rooms[room];
-    }
+    if (rooms[room].users.length === 0) delete rooms[room];
 
     io.emit("room-list", Object.keys(rooms));
     io.emit("user-list", rooms);
@@ -104,5 +100,4 @@ io.on("connection", (socket) => {
 
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("Server çalışıyor"));
+server.listen(3000, () => console.log("Server çalışıyor"));
