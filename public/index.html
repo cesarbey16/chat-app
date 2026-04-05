@@ -8,19 +8,14 @@
 <style>
 body{margin:0;display:flex;height:100vh;background:#0f172a;color:#fff;font-family:sans-serif}
 
-/* BUTTON */
 button{
   background:linear-gradient(45deg,#2563eb,#06b6d4);
   border:none;color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer
 }
 
-/* MENU */
 #menuBtn{display:none;position:absolute;top:10px;left:10px;z-index:999}
-
-/* SIDEBAR */
 #sidebar{width:240px;background:#020617;padding:15px}
 
-/* CHAT */
 #chat{flex:1;display:flex;flex-direction:column}
 #messages{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column}
 
@@ -38,7 +33,7 @@ button{
 
 video{width:220px;margin:5px;border-radius:10px;background:black}
 
-/* MOBILE */
+/* MOBİL */
 @media(max-width:768px){
   body{flex-direction:column}
   #menuBtn{display:block}
@@ -63,8 +58,7 @@ video{width:220px;margin:5px;border-radius:10px;background:black}
 
 <hr>
 
-<button onclick="startScreen()">📺 Paylaş</button>
-<button onclick="toggleMic()">🎤 Mic Aç/Kapa</button>
+<button onclick="startScreen()">📺 Ekran Paylaş</button>
 </div>
 
 <div id="chat">
@@ -85,12 +79,26 @@ let username = prompt("İsim:");
 let currentRoom = "";
 let stream, peer;
 
+/* ELEMENTLER */
+const msg = document.getElementById("msg");
+const messages = document.getElementById("messages");
+const roomsDiv = document.getElementById("rooms");
+const usersDiv = document.getElementById("users");
+const videos = document.getElementById("videos");
+const sidebar = document.getElementById("sidebar");
+const menuBtn = document.getElementById("menuBtn");
+
 /* MENU */
 menuBtn.onclick=()=>sidebar.classList.toggle("active");
 
 /* ENTER */
 msg.addEventListener("keypress",e=>{
   if(e.key==="Enter") send();
+});
+
+/* BAĞLANTI */
+socket.on("connect",()=>{
+  socket.emit("get-rooms");
 });
 
 /* ROOMS */
@@ -111,11 +119,16 @@ function joinRoom(room){
 
 socket.on("room-list",(rooms)=>{
   roomsDiv.innerHTML="";
+  if(rooms.length===0){
+    roomsDiv.innerHTML="Oda yok";
+    return;
+  }
   rooms.forEach(r=>{
     roomsDiv.innerHTML+=`<div class="room" onclick="joinRoom('${r}')">${r}</div>`;
   });
 });
 
+/* USERS */
 socket.on("user-list",(rooms)=>{
   usersDiv.innerHTML="";
   Object.keys(rooms).forEach(r=>{
@@ -141,29 +154,17 @@ socket.on("message",(d)=>{
   </div>`;
 });
 
-/* MIC */
-function toggleMic(){
-  if(!stream) return;
-  stream.getAudioTracks().forEach(t=>{
-    t.enabled=!t.enabled;
-  });
-}
-
 /* PEER */
 function createPeer(){
   return new RTCPeerConnection({
     iceServers:[
-      {urls:"stun:stun.l.google.com:19302"},
-      {
-        urls:"turn:openrelay.metered.ca:80",
-        username:"openrelayproject",
-        credential:"openrelayproject"
-      }
-    ]
+      {urls:"stun:stun.l.google.com:19302"}
+    ],
+    iceCandidatePoolSize:10
   });
 }
 
-/* SCREEN */
+/* SCREEN SHARE (HIZLANDIRILDI) */
 async function startScreen(){
 
   let screen = await navigator.mediaDevices.getDisplayMedia({
@@ -171,11 +172,8 @@ async function startScreen(){
     audio:true
   });
 
-  let mic = await navigator.mediaDevices.getUserMedia({audio:true});
-
   stream = new MediaStream([
-    ...screen.getTracks(),
-    ...mic.getAudioTracks()
+    ...screen.getTracks()
   ]);
 
   videos.innerHTML="";
@@ -184,6 +182,7 @@ async function startScreen(){
   video.srcObject=stream;
   video.autoplay=true;
   video.muted=true;
+  video.playsInline=true;
   video.onclick=()=>video.requestFullscreen();
   videos.appendChild(video);
 
@@ -195,9 +194,22 @@ async function startScreen(){
     if(e.candidate) socket.emit("ice-candidate",e.candidate);
   };
 
-  const offer=await peer.createOffer();
+  const offer=await peer.createOffer({
+    offerToReceiveVideo:true,
+    offerToReceiveAudio:true
+  });
+
   await peer.setLocalDescription(offer);
   socket.emit("offer",offer);
+
+  /* HIZ AYARI */
+  const sender = peer.getSenders().find(s=>s.track.kind==="video");
+  if(sender){
+    const params = sender.getParameters();
+    if(!params.encodings) params.encodings=[{}];
+    params.encodings[0].maxBitrate = 800000;
+    sender.setParameters(params);
+  }
 
   screen.getVideoTracks()[0].onended=()=>{
     videos.innerHTML="";
@@ -215,7 +227,7 @@ socket.on("offer",async offer=>{
     v.autoplay=true;
     v.controls=true;
     v.muted=false;
-    v.volume=1;
+    v.playsInline=true;
     videos.appendChild(v);
   };
 
