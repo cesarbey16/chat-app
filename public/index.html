@@ -2,31 +2,27 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Chat</title>
+<title>Chat Pro</title>
 
 <style>
 body{margin:0;display:flex;height:100vh;background:#0f172a;color:#fff;font-family:sans-serif}
 
-/* MENU BTN */
-#menuBtn{
-  display:none;
-  position:absolute;
-  top:10px;
-  left:10px;
-  z-index:999;
-  padding:8px;
-  background:#2563eb;
+/* BUTON STYLE */
+button{
+  background:linear-gradient(45deg,#2563eb,#06b6d4);
   border:none;
-  border-radius:6px;
   color:#fff;
+  padding:8px 12px;
+  border-radius:8px;
+  cursor:pointer;
+  transition:0.2s;
 }
+button:hover{transform:scale(1.05)}
+
+#menuBtn{display:none;position:absolute;top:10px;left:10px;z-index:999}
 
 /* SIDEBAR */
-#sidebar{
-  width:250px;
-  background:#020617;
-  padding:15px;
-}
+#sidebar{width:240px;background:#020617;padding:15px}
 
 /* CHAT */
 #chat{flex:1;display:flex;flex-direction:column}
@@ -36,37 +32,23 @@ body{margin:0;display:flex;height:100vh;background:#0f172a;color:#fff;font-famil
 .me{background:#2563eb;align-self:flex-end}
 .other{background:#1e293b}
 
-.time{font-size:11px;color:#94a3b8;text-align:right;margin-top:5px}
+.time{font-size:11px;color:#94a3b8;text-align:right}
 
 #input{display:flex;padding:10px;background:#020617}
 #msg{flex:1;padding:10px;border:none;border-radius:8px;background:#0f172a;color:#fff}
-#sendBtn{padding:8px 15px;margin-left:10px;background:#2563eb;border:none;border-radius:8px;color:#fff}
+#sendBtn{margin-left:10px}
 
 .room{padding:6px;margin:5px 0;background:#0f172a;border-radius:6px;cursor:pointer}
-.online{width:8px;height:8px;background:lime;border-radius:50%;display:inline-block;margin-left:5px}
+.online{width:8px;height:8px;background:lime;border-radius:50%;display:inline-block}
 
-video{width:220px;margin:5px;border-radius:10px}
+video{width:220px;margin:5px;border-radius:10px;background:black}
 
-/* 📱 MOBİL */
-@media (max-width:768px){
-
+/* MOBİL */
+@media(max-width:768px){
   body{flex-direction:column}
-
   #menuBtn{display:block}
-
-  #sidebar{
-    position:absolute;
-    left:-100%;
-    top:0;
-    height:100%;
-    width:220px;
-    transition:0.3s;
-    z-index:998;
-  }
-
+  #sidebar{position:absolute;left:-100%;top:0;height:100%;transition:0.3s}
   #sidebar.active{left:0}
-
-  .msg{max-width:85%}
   video{width:100%}
 }
 </style>
@@ -78,13 +60,17 @@ video{width:220px;margin:5px;border-radius:10px}
 
 <div id="sidebar">
 <h3>Odalar</h3>
-<button onclick="createRoom()">+ Oda Kur</button>
+<button onclick="createRoom()">+ Oda</button>
 <div id="rooms"></div>
 
 <h4>Aktif</h4>
 <div id="users"></div>
 
+<hr>
+
 <button onclick="startScreen()">📺 Paylaş</button>
+<button onclick="toggleMic()">🎤 Mic Aç/Kapa</button>
+
 </div>
 
 <div id="chat">
@@ -93,7 +79,7 @@ video{width:220px;margin:5px;border-radius:10px}
 
 <div id="input">
 <input id="msg" placeholder="Mesaj yaz...">
-<button id="sendBtn" onclick="send()">Gönder</button>
+<button onclick="send()">Gönder</button>
 </div>
 </div>
 
@@ -103,6 +89,7 @@ const socket = io();
 
 let username = prompt("İsim:");
 let currentRoom = "";
+let micEnabled = true;
 
 const msgInput = document.getElementById("msg");
 const messages = document.getElementById("messages");
@@ -112,23 +99,18 @@ const videos = document.getElementById("videos");
 
 /* MENU */
 document.getElementById("menuBtn").onclick=()=>{
-  document.getElementById("sidebar").classList.toggle("active");
+  sidebar.classList.toggle("active");
 };
 
 /* ENTER */
 msgInput.addEventListener("keypress",e=>{
-  if(e.key==="Enter"){
-    e.preventDefault();
-    send();
-  }
+  if(e.key==="Enter") send();
 });
 
 /* ODA */
 function createRoom(){
   const room=prompt("Oda adı:");
   const password=prompt("Şifre:");
-  if(!room||!password)return;
-
   socket.emit("create-room",{room,password,username});
   currentRoom=room;
   messages.innerHTML="";
@@ -144,10 +126,6 @@ function joinRoom(room){
 /* ROOMS */
 socket.on("room-list",(rooms)=>{
   roomsDiv.innerHTML="";
-  if(rooms.length===0){
-    roomsDiv.innerHTML="Oda yok";
-    return;
-  }
   rooms.forEach(r=>{
     roomsDiv.innerHTML+=`<div class="room" onclick="joinRoom('${r}')">${r}</div>`;
   });
@@ -157,7 +135,6 @@ socket.on("room-list",(rooms)=>{
 socket.on("user-list",(rooms)=>{
   usersDiv.innerHTML="";
   Object.keys(rooms).forEach(r=>{
-    usersDiv.innerHTML+=`<b>${r}</b><br>`;
     rooms[r].users.forEach(u=>{
       usersDiv.innerHTML+=`${u.username} <span class="online"></span><br>`;
     });
@@ -173,19 +150,26 @@ function send(){
 }
 
 socket.on("message",(d)=>{
-  const isMe=d.username===username;
-
   messages.innerHTML+=`
-  <div class="msg ${isMe?"me":"other"}">
-    ${!isMe?"<b>"+d.username+"</b><br>":""}
+  <div class="msg ${d.username===username?"me":"other"}">
+    ${d.username!==username?"<b>"+d.username+"</b><br>":""}
     ${d.msg}
     <div class="time">${d.time}</div>
   </div>`;
-
-  messages.scrollTop=messages.scrollHeight;
 });
 
-/* TURN */
+/* MIC CONTROL */
+function toggleMic(){
+  if(!stream) return;
+  stream.getAudioTracks().forEach(track=>{
+    track.enabled = !track.enabled;
+    micEnabled = track.enabled;
+  });
+}
+
+/* WEBRTC */
+let peer,stream;
+
 function createPeer(){
   return new RTCPeerConnection({
     iceServers:[
@@ -199,11 +183,18 @@ function createPeer(){
   });
 }
 
-/* SCREEN */
-let peer,stream;
-
+/* SCREEN SHARE (GELİŞMİŞ) */
 async function startScreen(){
-  stream=await navigator.mediaDevices.getDisplayMedia({video:true});
+
+  let screen = await navigator.mediaDevices.getDisplayMedia({video:true});
+  let mic = await navigator.mediaDevices.getUserMedia({audio:true});
+
+  stream = new MediaStream([
+    ...screen.getVideoTracks(),
+    ...mic.getAudioTracks()
+  ]);
+
+  videos.innerHTML="";
 
   const video=document.createElement("video");
   video.srcObject=stream;
@@ -213,17 +204,30 @@ async function startScreen(){
   videos.appendChild(video);
 
   peer=createPeer();
+
   stream.getTracks().forEach(t=>peer.addTrack(t,stream));
 
   peer.onicecandidate=e=>{
     if(e.candidate) socket.emit("ice-candidate",e.candidate);
   };
 
-  const offer=await peer.createOffer();
+  peer.onconnectionstatechange=()=>{
+    if(peer.connectionState==="disconnected"){
+      console.log("yeniden bağlanıyor...");
+    }
+  };
+
+  const offer=await peer.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});
   await peer.setLocalDescription(offer);
   socket.emit("offer",offer);
+
+  screen.getVideoTracks()[0].onended=()=>{
+    videos.innerHTML="";
+    if(peer) peer.close();
+  };
 }
 
+/* RECEIVE */
 socket.on("offer",async offer=>{
   peer=createPeer();
 
@@ -231,7 +235,7 @@ socket.on("offer",async offer=>{
     const v=document.createElement("video");
     v.srcObject=e.streams[0];
     v.autoplay=true;
-    v.onclick=()=>v.requestFullscreen();
+    v.controls=true;
     videos.appendChild(v);
   };
 
@@ -247,6 +251,7 @@ socket.on("offer",async offer=>{
 
 socket.on("answer",a=>peer.setRemoteDescription(a));
 socket.on("ice-candidate",c=>peer.addIceCandidate(c));
+
 </script>
 
 </body>
