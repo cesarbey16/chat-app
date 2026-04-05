@@ -4,8 +4,10 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
-  pingTimeout: 60000
+  pingTimeout: 60000,
+  cors: { origin: "*" }
 });
 
 app.use(express.static("public"));
@@ -48,8 +50,10 @@ io.on("connection", (socket) => {
     if (!socket.room) return;
 
     const now = new Date();
-    const time = now.getHours().toString().padStart(2,"0")+":"+
-                 now.getMinutes().toString().padStart(2,"0");
+    const time =
+      now.getHours().toString().padStart(2, "0") +
+      ":" +
+      now.getMinutes().toString().padStart(2, "0");
 
     io.to(socket.room).emit("message", {
       username: getUsername(socket.room, socket.id),
@@ -63,9 +67,9 @@ io.on("connection", (socket) => {
     return user ? user.username : "User";
   }
 
-  socket.on("offer",(d)=>socket.to(socket.room).emit("offer",d));
-  socket.on("answer",(d)=>socket.to(socket.room).emit("answer",d));
-  socket.on("ice-candidate",(d)=>socket.to(socket.room).emit("ice-candidate",d));
+  socket.on("offer", d => socket.to(socket.room).emit("offer", d));
+  socket.on("answer", d => socket.to(socket.room).emit("answer", d));
+  socket.on("ice-candidate", d => socket.to(socket.room).emit("ice-candidate", d));
 
   socket.on("disconnect", () => {
     const room = socket.room;
