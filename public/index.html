@@ -123,6 +123,12 @@ socket.on("message",(d)=>{
 /* TYPING */
 let t;
 msgInput.oninput=()=>{
+  msgInput.addEventListener("keypress", function(e){
+  if(e.key === "Enter"){
+    e.preventDefault();
+    send();
+  }
+});
   socket.emit("typing");
   clearTimeout(t);
   t=setTimeout(()=>socket.emit("stop-typing"),1000);
