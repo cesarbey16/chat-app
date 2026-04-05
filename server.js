@@ -6,7 +6,6 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  pingTimeout: 60000,
   cors: { origin: "*" }
 });
 
@@ -54,21 +53,17 @@ io.on("connection", (socket) => {
     if (!socket.room) return;
 
     const now = new Date();
-    const time =
-      now.getHours().toString().padStart(2, "0") +
-      ":" +
-      now.getMinutes().toString().padStart(2, "0");
+    const time = now.getHours()+":"+now.getMinutes();
 
     io.to(socket.room).emit("message", {
-      username: getUsername(socket.room, socket.id),
+      username: getUser(socket.room, socket.id),
       msg,
       time
     });
   });
 
-  function getUsername(room, id) {
-    const user = rooms[room]?.users.find(u => u.id === id);
-    return user ? user.username : "User";
+  function getUser(room, id){
+    return rooms[room]?.users.find(u=>u.id===id)?.username || "User";
   }
 
   socket.on("offer", d => socket.to(socket.room).emit("offer", d));
