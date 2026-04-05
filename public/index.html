@@ -1,44 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chat Pro</title>
-
 <style>
 body{margin:0;display:flex;height:100vh;background:#0f172a;color:#fff;font-family:sans-serif}
-
-button{
-  background:linear-gradient(45deg,#2563eb,#06b6d4);
-  border:none;color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer
-}
-
-#menuBtn{display:none;position:absolute;top:10px;left:10px;z-index:999}
-#sidebar{width:240px;background:#020617;padding:15px}
-
+#sidebar{width:220px;background:#020617;padding:10px}
 #chat{flex:1;display:flex;flex-direction:column}
-#messages{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column}
+#messages{flex:1;overflow:auto;padding:10px}
+#videos{display:flex;flex-wrap:wrap}
 
-.msg{max-width:60%;padding:10px;margin:5px;border-radius:10px}
-.me{background:#2563eb;align-self:flex-end}
-.other{background:#1e293b}
+video{width:300px;border-radius:10px;margin:5px;background:black}
 
-.time{font-size:11px;color:#94a3b8}
-
-#input{display:flex;padding:10px;background:#020617}
-#msg{flex:1;padding:10px;border:none;border-radius:8px;background:#0f172a;color:#fff}
-
-.room{padding:6px;margin:5px 0;background:#0f172a;border-radius:6px;cursor:pointer}
-.online{width:8px;height:8px;background:lime;border-radius:50%;display:inline-block}
-
-video{width:220px;margin:5px;border-radius:10px;background:black}
-
-/* MOBİL */
 @media(max-width:768px){
   body{flex-direction:column}
-  #menuBtn{display:block}
-  #sidebar{position:absolute;left:-100%;top:0;height:100%;transition:0.3s}
-  #sidebar.active{left:0}
   video{width:100%}
 }
 </style>
@@ -46,204 +20,111 @@ video{width:220px;margin:5px;border-radius:10px;background:black}
 
 <body>
 
-<button id="menuBtn">☰</button>
-
 <div id="sidebar">
-<h3>Odalar</h3>
-<button onclick="createRoom()">+ Oda</button>
-<div id="rooms"></div>
-
-<h4>Aktif</h4>
-<div id="users"></div>
-
-<hr>
-
-<button onclick="startScreen()">📺 Ekran Paylaş</button>
+<button onclick="startScreen()">Ekran Paylaş</button>
 </div>
 
 <div id="chat">
 <div id="messages"></div>
 <div id="videos"></div>
-
-<div id="input">
-<input id="msg" placeholder="Mesaj yaz...">
-<button onclick="send()">Gönder</button>
-</div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
 
-let username = prompt("İsim:");
-let currentRoom = "";
-let stream, peer;
+let peer;
+let localStream;
 
-/* ELEMENTLER */
-const msg = document.getElementById("msg");
-const messages = document.getElementById("messages");
-const roomsDiv = document.getElementById("rooms");
-const usersDiv = document.getElementById("users");
-const videos = document.getElementById("videos");
-const sidebar = document.getElementById("sidebar");
-const menuBtn = document.getElementById("menuBtn");
-
-/* MENU */
-menuBtn.onclick=()=>sidebar.classList.toggle("active");
-
-/* ENTER */
-msg.addEventListener("keypress",e=>{
-  if(e.key==="Enter") send();
-});
-
-/* BAĞLANTI */
-socket.on("connect",()=>{
-  socket.emit("get-rooms");
-});
-
-/* ROOMS */
-function createRoom(){
-  const room=prompt("Oda adı:");
-  const password=prompt("Şifre:");
-  socket.emit("create-room",{room,password,username});
-  currentRoom=room;
-  messages.innerHTML="";
+/* TEK VIDEO KONTROL */
+function clearVideos(){
+  document.getElementById("videos").innerHTML="";
 }
-
-function joinRoom(room){
-  const password=prompt("Şifre:");
-  socket.emit("join-room",{room,password,username});
-  currentRoom=room;
-  messages.innerHTML="";
-}
-
-socket.on("room-list",(rooms)=>{
-  roomsDiv.innerHTML="";
-  if(rooms.length===0){
-    roomsDiv.innerHTML="Oda yok";
-    return;
-  }
-  rooms.forEach(r=>{
-    roomsDiv.innerHTML+=`<div class="room" onclick="joinRoom('${r}')">${r}</div>`;
-  });
-});
-
-/* USERS */
-socket.on("user-list",(rooms)=>{
-  usersDiv.innerHTML="";
-  Object.keys(rooms).forEach(r=>{
-    rooms[r].users.forEach(u=>{
-      usersDiv.innerHTML+=`${u.username} <span class="online"></span><br>`;
-    });
-  });
-});
-
-/* MESSAGE */
-function send(){
-  if(!msg.value) return;
-  socket.emit("message",msg.value);
-  msg.value="";
-}
-
-socket.on("message",(d)=>{
-  messages.innerHTML+=`
-  <div class="msg ${d.username===username?"me":"other"}">
-    ${d.username!==username?"<b>"+d.username+"</b><br>":""}
-    ${d.msg}
-    <div class="time">${d.time}</div>
-  </div>`;
-});
 
 /* PEER */
 function createPeer(){
   return new RTCPeerConnection({
-    iceServers:[
-      {urls:"stun:stun.l.google.com:19302"}
-    ],
+    iceServers:[{urls:"stun:stun.l.google.com:19302"}],
     iceCandidatePoolSize:10
   });
 }
 
-/* SCREEN SHARE (HIZLANDIRILDI) */
+/* EKRAN PAYLAŞ */
 async function startScreen(){
 
-  let screen = await navigator.mediaDevices.getDisplayMedia({
+  clearVideos(); // 🔥 ÇİFT EKRANI SİLER
+
+  const screen = await navigator.mediaDevices.getDisplayMedia({
     video:true,
     audio:true
   });
 
-  stream = new MediaStream([
-    ...screen.getTracks()
-  ]);
+  localStream = screen;
 
-  videos.innerHTML="";
+  peer = createPeer();
 
-  const video=document.createElement("video");
-  video.srcObject=stream;
-  video.autoplay=true;
-  video.muted=true;
-  video.playsInline=true;
-  video.onclick=()=>video.requestFullscreen();
-  videos.appendChild(video);
-
-  peer=createPeer();
-
-  stream.getTracks().forEach(t=>peer.addTrack(t,stream));
-
-  peer.onicecandidate=e=>{
-    if(e.candidate) socket.emit("ice-candidate",e.candidate);
-  };
-
-  const offer=await peer.createOffer({
-    offerToReceiveVideo:true,
-    offerToReceiveAudio:true
+  screen.getTracks().forEach(track=>{
+    peer.addTrack(track, screen);
   });
 
-  await peer.setLocalDescription(offer);
-  socket.emit("offer",offer);
+  peer.onicecandidate=e=>{
+    if(e.candidate) socket.emit("ice-candidate", e.candidate);
+  };
 
-  /* HIZ AYARI */
-  const sender = peer.getSenders().find(s=>s.track.kind==="video");
-  if(sender){
-    const params = sender.getParameters();
-    if(!params.encodings) params.encodings=[{}];
-    params.encodings[0].maxBitrate = 800000;
-    sender.setParameters(params);
-  }
+  const offer = await peer.createOffer();
+  await peer.setLocalDescription(offer);
+  socket.emit("offer", offer);
+
+  /* SADECE KENDİ EKRANINI GÖSTERMEK İSTERSEN AÇ */
+  /*
+  const video=document.createElement("video");
+  video.srcObject=screen;
+  video.autoplay=true;
+  video.muted=true;
+  document.getElementById("videos").appendChild(video);
+  */
 
   screen.getVideoTracks()[0].onended=()=>{
-    videos.innerHTML="";
+    clearVideos();
     if(peer) peer.close();
   };
 }
 
 /* RECEIVE */
-socket.on("offer",async offer=>{
-  peer=createPeer();
+socket.on("offer", async offer=>{
+  clearVideos(); // 🔥 ESKİYİ SİL
+
+  peer = createPeer();
 
   peer.ontrack=e=>{
-    const v=document.createElement("video");
-    v.srcObject=e.streams[0];
-    v.autoplay=true;
-    v.controls=true;
-    v.muted=false;
-    v.playsInline=true;
-    videos.appendChild(v);
+    clearVideos(); // 🔥 TEK VIDEO GARANTİ
+
+    const video=document.createElement("video");
+    video.srcObject=e.streams[0];
+    video.autoplay=true;
+    video.controls=true;
+    video.playsInline=true;
+
+    document.getElementById("videos").appendChild(video);
   };
 
   peer.onicecandidate=e=>{
-    if(e.candidate) socket.emit("ice-candidate",e.candidate);
+    if(e.candidate) socket.emit("ice-candidate", e.candidate);
   };
 
   await peer.setRemoteDescription(offer);
-  const answer=await peer.createAnswer();
+  const answer = await peer.createAnswer();
   await peer.setLocalDescription(answer);
-  socket.emit("answer",answer);
+  socket.emit("answer", answer);
 });
 
-socket.on("answer",a=>peer.setRemoteDescription(a));
-socket.on("ice-candidate",c=>peer.addIceCandidate(c));
+socket.on("answer", a=>{
+  peer.setRemoteDescription(a);
+});
 
+socket.on("ice-candidate", c=>{
+  peer.addIceCandidate(c);
+});
 </script>
 
 </body>
