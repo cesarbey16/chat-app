@@ -5,38 +5,159 @@
 <title>Chat</title>
 
 <style>
-body{margin:0;display:flex;height:100vh;font-family:sans-serif;background:#0b141a}
-#sidebar{width:25%;background:#111b21;color:#fff;padding:10px}
-#chat{flex:1;display:flex;flex-direction:column}
-#messages{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  display:flex;
+  height:100vh;
+  font-family:sans-serif;
+  background:#0f172a;
+  color:#fff;
+}
 
-.msg{max-width:60%;padding:10px;margin:5px;border-radius:10px}
-.me{background:#005c4b;align-self:flex-end}
-.other{background:#202c33}
+/* SIDEBAR */
+#sidebar{
+  width:260px;
+  background:#020617;
+  padding:15px;
+  border-right:1px solid #1e293b;
+}
 
-#input{display:flex;padding:10px;background:#202c33}
-#msg{flex:1;padding:10px}
-button{margin-left:10px;padding:10px;background:#25D366;color:white;border:none}
+h3,h4{
+  margin:10px 0;
+  color:#38bdf8;
+}
 
-.room{margin:5px 0;cursor:pointer}
-.user{margin:5px 0}
-.online{width:8px;height:8px;background:lime;border-radius:50%;display:inline-block;margin-left:5px}
+button{
+  width:100%;
+  padding:10px;
+  margin:5px 0;
+  border:none;
+  border-radius:8px;
+  background:#2563eb;
+  color:#fff;
+  cursor:pointer;
+  transition:0.2s;
+}
 
-video{width:200px;margin:5px;border-radius:10px}
+button:hover{
+  background:#1d4ed8;
+}
+
+/* ROOMS */
+.room{
+  padding:8px;
+  margin:5px 0;
+  background:#0f172a;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.room:hover{
+  background:#1e293b;
+}
+
+/* CHAT */
+#chat{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+
+#messages{
+  flex:1;
+  overflow:auto;
+  padding:15px;
+  display:flex;
+  flex-direction:column;
+}
+
+/* MESSAGE */
+.msg{
+  max-width:60%;
+  padding:10px;
+  margin:5px 0;
+  border-radius:12px;
+  animation:fade 0.2s ease;
+}
+
+.me{
+  background:#2563eb;
+  align-self:flex-end;
+}
+
+.other{
+  background:#1e293b;
+}
+
+/* INPUT */
+#input{
+  display:flex;
+  padding:10px;
+  background:#020617;
+  border-top:1px solid #1e293b;
+}
+
+#msg{
+  flex:1;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  outline:none;
+  background:#0f172a;
+  color:#fff;
+}
+
+/* USERS */
+.user{
+  font-size:14px;
+}
+
+.online{
+  width:8px;
+  height:8px;
+  background:lime;
+  border-radius:50%;
+  display:inline-block;
+  margin-left:5px;
+}
+
+/* VIDEO */
+video{
+  width:220px;
+  margin:5px;
+  border-radius:10px;
+  border:2px solid #1e293b;
+}
+
+/* typing */
+#typing{
+  padding-left:10px;
+  font-size:13px;
+  color:#94a3b8;
+}
+
+/* anim */
+@keyframes fade{
+  from{opacity:0;transform:translateY(5px)}
+  to{opacity:1;transform:translateY(0)}
+}
 </style>
 </head>
 
 <body>
 
 <div id="sidebar">
-<h3>Odalar</h3>
+<h3>💬 Odalar</h3>
+
 <button onclick="createRoom()">+ Oda Kur</button>
+
 <div id="rooms"></div>
 
-<h4>Aktif</h4>
+<h4>👥 Aktif</h4>
 <div id="users"></div>
 
-<button onclick="startScreen()">📺 Paylaş</button>
+<button onclick="startScreen()">📺 Ekran Paylaş</button>
 </div>
 
 <div id="chat">
@@ -45,7 +166,7 @@ video{width:200px;margin:5px;border-radius:10px}
 <div id="videos"></div>
 
 <div id="input">
-<input id="msg">
+<input id="msg" placeholder="Mesaj yaz...">
 <button onclick="send()">Gönder</button>
 </div>
 </div>
@@ -64,6 +185,14 @@ const videos = document.getElementById("videos");
 let username = prompt("İsim:");
 let currentRoom = "";
 
+/* ENTER İLE GÖNDER */
+msgInput.addEventListener("keypress", function(e){
+  if(e.key === "Enter"){
+    e.preventDefault();
+    send();
+  }
+});
+
 /* ODA KUR */
 function createRoom(){
   const room = prompt("Oda adı:");
@@ -72,6 +201,7 @@ function createRoom(){
 
   socket.emit("create-room",{room,password,username});
   currentRoom = room;
+  messages.innerHTML = "";
 }
 
 /* ODAYA GİR */
@@ -79,11 +209,18 @@ function joinRoom(room){
   const password = prompt("Şifre:");
   socket.emit("join-room",{room,password,username});
   currentRoom = room;
+  messages.innerHTML = "";
 }
 
 /* ODA LİSTESİ */
 socket.on("room-list",(rooms)=>{
   roomsDiv.innerHTML="";
+
+  if(rooms.length === 0){
+    roomsDiv.innerHTML = "<p>🚀 Henüz oda yok<br>İlk odayı sen kur</p>";
+    return;
+  }
+
   rooms.forEach(r=>{
     roomsDiv.innerHTML += `<div class="room" onclick="joinRoom('${r}')">${r}</div>`;
   });
@@ -95,7 +232,7 @@ socket.on("user-list",(rooms)=>{
   Object.keys(rooms).forEach(r=>{
     usersDiv.innerHTML += `<b>${r}</b><br>`;
     rooms[r].users.forEach(u=>{
-      usersDiv.innerHTML += `${u.username} <span class="online"></span><br>`;
+      usersDiv.innerHTML += `<div class="user">${u.username} <span class="online"></span></div>`;
     });
   });
 });
@@ -118,17 +255,13 @@ socket.on("message",(d)=>{
       ${d.msg}
     </div>
   `;
+
+  messages.scrollTop = messages.scrollHeight;
 });
 
 /* TYPING */
 let t;
 msgInput.oninput=()=>{
-  msgInput.addEventListener("keypress", function(e){
-  if(e.key === "Enter"){
-    e.preventDefault();
-    send();
-  }
-});
   socket.emit("typing");
   clearTimeout(t);
   t=setTimeout(()=>socket.emit("stop-typing"),1000);
@@ -137,18 +270,17 @@ msgInput.oninput=()=>{
 socket.on("typing",u=>typingDiv.innerText=u+" yazıyor...");
 socket.on("stop-typing",()=>typingDiv.innerText="");
 
-/* EKRAN PAYLAŞIM */
+/* SCREEN SHARE (AYNI) */
 let peer,localStream,localVideo;
 
 async function startScreen(){
-  localStream = await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+  localStream = await navigator.mediaDevices.getDisplayMedia({video:true});
 
   localVideo=document.createElement("video");
   localVideo.srcObject=localStream;
   localVideo.autoplay=true;
   localVideo.muted=true;
   localVideo.controls=true;
-
   localVideo.onclick=()=>localVideo.requestFullscreen();
 
   videos.appendChild(localVideo);
@@ -164,19 +296,7 @@ async function startScreen(){
   const offer=await peer.createOffer();
   await peer.setLocalDescription(offer);
   socket.emit("offer",offer);
-
-  localStream.getVideoTracks()[0].onended=stopScreen;
 }
-
-function stopScreen(){
-  if(localVideo) localVideo.remove();
-  if(localStream) localStream.getTracks().forEach(t=>t.stop());
-  if(peer) peer.close();
-
-  socket.emit("stop-screen");
-}
-
-socket.on("stop-screen",()=>videos.innerHTML="");
 
 socket.on("offer",async offer=>{
   peer=new RTCPeerConnection();
