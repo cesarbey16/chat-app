@@ -47,7 +47,7 @@ button{padding:6px;margin:3px}
 <div id="videos"></div>
 
 <div id="input">
-<input id="msg">
+<input id="msg" placeholder="Mesaj yaz...">
 <button onclick="send()">Gönder</button>
 </div>
 </div>
@@ -60,6 +60,18 @@ let username = prompt("İsim:");
 let currentRoom = "";
 let peer;
 let stream;
+
+/* ENTER TUŞU FIX */
+window.onload = () => {
+  const input = document.getElementById("msg");
+
+  input.addEventListener("keydown", function(e){
+    if(e.key === "Enter" && !e.shiftKey){
+      e.preventDefault();
+      send();
+    }
+  });
+};
 
 /* ROOMS */
 function createRoom(){
@@ -139,7 +151,7 @@ async function startScreen(){
   await peer.setLocalDescription(offer);
   socket.emit("offer",offer);
 
-  socket.emit("start-stream"); // 🔥 HOST OL
+  socket.emit("start-stream");
 
   stream.getVideoTracks()[0].onended=()=>{
     document.getElementById("videos").innerHTML="";
@@ -148,7 +160,7 @@ async function startScreen(){
   };
 }
 
-/* YAYINCI GÖSTER */
+/* YAYINCI */
 socket.on("stream-started",(data)=>{
   document.getElementById("streamInfo").innerText="📺 Yayıncı: "+data.username;
 });
@@ -158,7 +170,7 @@ socket.on("stream-stopped",()=>{
   document.getElementById("streamInfo").innerText="";
 });
 
-/* HOST TEKRAR OFFER ATSIN */
+/* HOST OFFER */
 socket.on("request-offer", async ()=>{
   if(!peer) return;
 
