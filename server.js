@@ -18,14 +18,10 @@ io.on("connection", (socket) => {
   socket.emit("room-list", Object.keys(rooms));
   socket.emit("user-list", rooms);
 
-  socket.on("get-rooms", () => {
-    socket.emit("room-list", Object.keys(rooms));
-  });
-
   socket.on("create-room", ({ room, password, username }) => {
     if (rooms[room]) return;
 
-    rooms[room] = { password, users: [] };
+    rooms[room] = { password, users: [], host: null };
 
     socket.join(room);
     socket.room = room;
@@ -45,13 +41,28 @@ io.on("connection", (socket) => {
 
     rooms[room].users.push({ id: socket.id, username });
 
-    // 🔥 YENİ GELEN VAR → HOST'A HABER VER
-    socket.to(room).emit("new-user-joined");
+    // 🔥 Eğer host varsa → yeni gelen için offer iste
+    const hostId = rooms[room].host;
+    if (hostId) {
+      io.to(hostId).emit("request-offer");
+    }
 
     io.emit("room-list", Object.keys(rooms));
     io.emit("user-list", rooms);
   });
 
+  /* 🎬 HOST BAŞLAT */
+  socket.on("start-stream", () => {
+    if (!socket.room) return;
+
+    rooms[socket.room].host = socket.id;
+
+    io.to(socket.room).emit("stream-started", {
+      username: getUser(socket.room, socket.id)
+    });
+  });
+
+  /* 📩 OFFER İSTE */
   socket.on("request-offer", () => {
     socket.to(socket.room).emit("request-offer");
   });
@@ -80,6 +91,12 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     const room = socket.room;
     if (!room || !rooms[room]) return;
+
+    // host ise sıfırla
+    if (rooms[room].host === socket.id) {
+      rooms[room].host = null;
+      io.to(room).emit("stream-stopped");
+    }
 
     rooms[room].users = rooms[room].users.filter(u => u.id !== socket.id);
 
