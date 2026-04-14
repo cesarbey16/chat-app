@@ -19,6 +19,8 @@ video{width:250px;margin:5px;border-radius:10px;background:black}
 #input input{flex:1;padding:10px}
 button{padding:6px;margin:3px}
 
+#streamInfo{padding:5px;font-weight:bold}
+
 @media(max-width:768px){
  body{flex-direction:column}
  video{width:100%}
@@ -40,6 +42,7 @@ button{padding:6px;margin:3px}
 </div>
 
 <div id="chat">
+<div id="streamInfo"></div>
 <div id="messages"></div>
 <div id="videos"></div>
 
@@ -114,7 +117,7 @@ function createPeer(){
   });
 }
 
-/* SCREEN SHARE */
+/* SCREEN */
 async function startScreen(){
 
   document.getElementById("videos").innerHTML="";
@@ -136,27 +139,32 @@ async function startScreen(){
   await peer.setLocalDescription(offer);
   socket.emit("offer",offer);
 
-  /* YENİ GELENLER İÇİN */
-  socket.emit("request-offer");
+  socket.emit("start-stream"); // 🔥 HOST OL
 
   stream.getVideoTracks()[0].onended=()=>{
     document.getElementById("videos").innerHTML="";
+    socket.emit("stop-stream");
     if(peer) peer.close();
   };
 }
 
-/* 🔥 YENİ KULLANICI GELİNCE */
-socket.on("new-user-joined",()=>{
-  socket.emit("request-offer");
+/* YAYINCI GÖSTER */
+socket.on("stream-started",(data)=>{
+  document.getElementById("streamInfo").innerText="📺 Yayıncı: "+data.username;
 });
 
-/* 🔥 HOST TEKRAR OFFER ATSIN */
+socket.on("stream-stopped",()=>{
+  document.getElementById("videos").innerHTML="";
+  document.getElementById("streamInfo").innerText="";
+});
+
+/* HOST TEKRAR OFFER ATSIN */
 socket.on("request-offer", async ()=>{
   if(!peer) return;
 
-  const offer = await peer.createOffer();
+  const offer=await peer.createOffer();
   await peer.setLocalDescription(offer);
-  socket.emit("offer", offer);
+  socket.emit("offer",offer);
 });
 
 /* RECEIVE */
