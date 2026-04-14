@@ -45,8 +45,15 @@ io.on("connection", (socket) => {
 
     rooms[room].users.push({ id: socket.id, username });
 
+    // 🔥 YENİ GELEN VAR → HOST'A HABER VER
+    socket.to(room).emit("new-user-joined");
+
     io.emit("room-list", Object.keys(rooms));
     io.emit("user-list", rooms);
+  });
+
+  socket.on("request-offer", () => {
+    socket.to(socket.room).emit("request-offer");
   });
 
   socket.on("message", (msg) => {
