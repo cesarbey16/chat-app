@@ -56,6 +56,7 @@ const socket = io();
 let username = prompt("İsim:");
 let currentRoom = "";
 let peer;
+let stream;
 
 /* ROOMS */
 function createRoom(){
@@ -71,7 +72,7 @@ function joinRoom(r){
   currentRoom=r;
 }
 
-/* LİSTE */
+/* LIST */
 socket.on("room-list",(rooms)=>{
   const div=document.getElementById("rooms");
   div.innerHTML="";
@@ -118,7 +119,7 @@ async function startScreen(){
 
   document.getElementById("videos").innerHTML="";
 
-  const stream = await navigator.mediaDevices.getDisplayMedia({
+  stream = await navigator.mediaDevices.getDisplayMedia({
     video:true,
     audio:true
   });
@@ -135,11 +136,28 @@ async function startScreen(){
   await peer.setLocalDescription(offer);
   socket.emit("offer",offer);
 
+  /* YENİ GELENLER İÇİN */
+  socket.emit("request-offer");
+
   stream.getVideoTracks()[0].onended=()=>{
     document.getElementById("videos").innerHTML="";
     if(peer) peer.close();
   };
 }
+
+/* 🔥 YENİ KULLANICI GELİNCE */
+socket.on("new-user-joined",()=>{
+  socket.emit("request-offer");
+});
+
+/* 🔥 HOST TEKRAR OFFER ATSIN */
+socket.on("request-offer", async ()=>{
+  if(!peer) return;
+
+  const offer = await peer.createOffer();
+  await peer.setLocalDescription(offer);
+  socket.emit("offer", offer);
+});
 
 /* RECEIVE */
 socket.on("offer",async offer=>{
