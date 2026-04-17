@@ -7,23 +7,63 @@
 
 <style>
 body{margin:0;font-family:sans-serif;background:#0b0f19;color:white}
-.sidebar{width:250px;background:#111;padding:10px;height:100vh;overflow:auto}
-.room{padding:10px;background:#222;margin:5px 0;border-radius:8px;cursor:pointer}
-.chat{flex:1;display:flex;flex-direction:column}
 .container{display:flex;height:100vh}
-.messages{flex:1;padding:10px;overflow:auto}
-.msg{margin:5px;padding:10px;border-radius:10px;max-width:70%}
+
+.sidebar{
+  width:250px;
+  background:#111;
+  padding:10px;
+  overflow:auto;
+}
+
+.room{
+  padding:10px;
+  background:#222;
+  margin:5px 0;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+.room:hover{background:#333}
+
+.chat{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+
+.messages{
+  flex:1;
+  padding:10px;
+  overflow:auto;
+}
+
+.msg{
+  margin:5px;
+  padding:10px;
+  border-radius:10px;
+  max-width:70%;
+}
+
 .me{background:#22c55e;margin-left:auto}
 .other{background:#333}
-.inputBox{display:flex}
-input{flex:1;padding:10px}
-button{padding:10px}
+
+.inputBox{
+  display:flex;
+}
+
+input{
+  flex:1;
+  padding:10px;
+}
+
+button{
+  padding:10px;
+}
 
 @media(max-width:700px){
-.sidebar{display:none}
-.container{flex-direction:column}
+  .sidebar{display:none}
 }
-video{width:100%}
 </style>
 </head>
 
@@ -32,7 +72,7 @@ video{width:100%}
 <div class="container">
 
 <div class="sidebar">
-  <button onclick="openModal()">+</button>
+  <button onclick="createRoom()">+ Oda</button>
   <button onclick="startScreen()">📺</button>
   <div id="rooms"></div>
   <div id="users"></div>
@@ -40,8 +80,9 @@ video{width:100%}
 
 <div class="chat">
   <div class="messages" id="messages"></div>
+
   <div class="inputBox">
-    <input id="msg">
+    <input id="msg" placeholder="Mesaj yaz">
     <button onclick="send()">Gönder</button>
   </div>
 </div>
@@ -53,9 +94,8 @@ video{width:100%}
 <script>
 const socket = io();
 
-let username = prompt("İsim");
-let room="";
-let peerConnections = {};
+let username = prompt("İsmin");
+let currentRoom="";
 let localStream;
 
 /* ROOMS */
@@ -64,10 +104,11 @@ socket.emit("getRooms");
 socket.on("rooms", list=>{
   const div=document.getElementById("rooms");
   div.innerHTML="";
+
   list.forEach(r=>{
     const el=document.createElement("div");
     el.className="room";
-    el.innerText=r.name+" ("+r.count+")";
+    el.innerText=`${r.locked?"🔒":"🟢"} ${r.name} (${r.count})`;
     el.onclick=()=>joinRoom(r.name);
     div.appendChild(el);
   });
@@ -75,85 +116,79 @@ socket.on("rooms", list=>{
 
 /* USERS */
 socket.on("users", list=>{
-  document.getElementById("users").innerText="👥 "+list.join(",");
+  document.getElementById("users").innerText =
+    "👥 " + list.join(", ");
+});
+
+/* ERROR */
+socket.on("errorMsg", msg=>{
+  alert(msg);
 });
 
 /* JOIN */
 function joinRoom(name){
-  const pass=prompt("Şifre");
+  const pass = prompt("Şifre");
   socket.emit("joinRoom",{room:name,username,pass});
-  room=name;
+  currentRoom=name;
+}
+
+/* CREATE ROOM */
+function createRoom(){
+  const name = prompt("Oda adı");
+  const pass = prompt("Şifre (boş olabilir)");
+
+  if(!name) return;
+
+  socket.emit("createRoom",{name,pass});
 }
 
 /* CHAT */
 function send(){
   const m=document.getElementById("msg").value;
+  if(!m) return;
+
   socket.emit("chatMessage",m);
   addMsg(m,true);
+
   document.getElementById("msg").value="";
 }
 
-function addMsg(t,me){
+function addMsg(text,me){
   const d=document.createElement("div");
   d.className="msg "+(me?"me":"other");
-  d.innerText=t;
+  d.innerText=text;
   document.getElementById("messages").appendChild(d);
 }
 
-socket.on("message",m=>addMsg(m.text,false));
+socket.on("message",m=>{
+  addMsg(m.text,false);
+});
 
-/* WEBRTC */
-const config={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};
+/* ENTER */
+document.getElementById("msg").addEventListener("keypress",e=>{
+  if(e.key==="Enter") send();
+});
 
+/* SCREEN (BASİT) */
 async function startScreen(){
-  localStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
-  socket.emit("startScreen");
-}
+  try{
+    localStream = await navigator.mediaDevices.getDisplayMedia({
+      video:true,
+      audio:true
+    });
 
-socket.on("screenStarted", async ({id})=>{
-  if(id===socket.id) return;
+    socket.emit("startScreen");
 
-  const pc=new RTCPeerConnection(config);
-  peerConnections[id]=pc;
+    let v=document.createElement("video");
+    v.srcObject=localStream;
+    v.autoplay=true;
+    v.style.width="200px";
+    document.body.appendChild(v);
 
-  pc.ontrack=e=>{
-    let v=document.getElementById("video");
-    if(!v){
-      v=document.createElement("video");
-      v.id="video";
-      v.autoplay=true;
-      document.body.appendChild(v);
-    }
-    v.srcObject=e.streams[0];
-  };
-
-  const offer=await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  socket.emit("offer",{offer,to:id});
-});
-
-socket.on("offer", async ({offer,from})=>{
-  const pc=new RTCPeerConnection(config);
-  peerConnections[from]=pc;
-
-  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-
-  await pc.setRemoteDescription(offer);
-  const answer=await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-
-  socket.emit("answer",{answer,to:from});
-});
-
-socket.on("answer", async ({answer,from})=>{
-  await peerConnections[from].setRemoteDescription(answer);
-});
-
-socket.on("candidate", async ({candidate,from})=>{
-  if(peerConnections[from]){
-    await peerConnections[from].addIceCandidate(candidate);
+  }catch(e){
+    alert("Ekran paylaşımı desteklenmiyor");
   }
-});
+}
 </script>
 
 </body>
