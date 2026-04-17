@@ -14,7 +14,7 @@ io.on("connection", socket => {
   socket.on("joinRoom", ({room, username, pass})=>{
     const r = rooms.find(x=>x.name===room);
 
-    if(r && r.pass === pass){
+    if(r && r.pass === pass){s
       socket.join(room);
       socket.room = room;
       socket.username = username;
