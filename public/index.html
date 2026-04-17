@@ -9,60 +9,28 @@
 body{margin:0;font-family:sans-serif;background:#0b0f19;color:white}
 .container{display:flex;height:100vh}
 
-.sidebar{
-  width:250px;
-  background:#111;
-  padding:10px;
-  overflow:auto;
-}
-
-.room{
-  padding:10px;
-  background:#222;
-  margin:5px 0;
-  border-radius:8px;
-  cursor:pointer;
-}
-
+.sidebar{width:250px;background:#111;padding:10px;overflow:auto}
+.room{padding:10px;background:#222;margin:5px 0;border-radius:8px;cursor:pointer}
 .room:hover{background:#333}
 
-.chat{
-  flex:1;
-  display:flex;
-  flex-direction:column;
-}
+.chat{flex:1;display:flex;flex-direction:column}
+.messages{flex:1;padding:10px;overflow:auto}
 
-.messages{
-  flex:1;
-  padding:10px;
-  overflow:auto;
-}
-
-.msg{
-  margin:5px;
-  padding:10px;
-  border-radius:10px;
-  max-width:70%;
-}
-
+.msg{margin:5px;padding:10px;border-radius:10px;max-width:70%}
 .me{background:#22c55e;margin-left:auto}
 .other{background:#333}
 
-.inputBox{
-  display:flex;
-}
+.inputBox{display:flex}
+input{flex:1;padding:10px}
+button{padding:10px}
 
-input{
-  flex:1;
-  padding:10px;
-}
+video{position:fixed;top:10px;right:10px;width:200px;border-radius:10px}
 
-button{
-  padding:10px;
-}
-
+/* MOBİL */
 @media(max-width:700px){
   .sidebar{display:none}
+  .inputBox{position:fixed;bottom:0;width:100%}
+  video{width:100% !important;right:0;top:auto;bottom:60px}
 }
 </style>
 </head>
@@ -74,6 +42,13 @@ button{
 <div class="sidebar">
   <button onclick="createRoom()">+ Oda</button>
   <button onclick="startScreen()">📺</button>
+
+  <select id="quality">
+    <option value="low">Düşük</option>
+    <option value="medium" selected>Orta</option>
+    <option value="high">Yüksek</option>
+  </select>
+
   <div id="rooms"></div>
   <div id="users"></div>
 </div>
@@ -95,6 +70,8 @@ button{
 const socket = io();
 
 let username = prompt("İsmin");
+socket.emit("setName", username);
+
 let currentRoom="";
 let localStream;
 
@@ -104,7 +81,6 @@ socket.emit("getRooms");
 socket.on("rooms", list=>{
   const div=document.getElementById("rooms");
   div.innerHTML="";
-
   list.forEach(r=>{
     const el=document.createElement("div");
     el.className="room";
@@ -116,14 +92,11 @@ socket.on("rooms", list=>{
 
 /* USERS */
 socket.on("users", list=>{
-  document.getElementById("users").innerText =
-    "👥 " + list.join(", ");
+  document.getElementById("users").innerText="👥 "+list.join(", ");
 });
 
 /* ERROR */
-socket.on("errorMsg", msg=>{
-  alert(msg);
-});
+socket.on("errorMsg", msg=>alert(msg));
 
 /* JOIN */
 function joinRoom(name){
@@ -132,13 +105,11 @@ function joinRoom(name){
   currentRoom=name;
 }
 
-/* CREATE ROOM */
+/* CREATE */
 function createRoom(){
   const name = prompt("Oda adı");
-  const pass = prompt("Şifre (boş olabilir)");
-
+  const pass = prompt("Şifre");
   if(!name) return;
-
   socket.emit("createRoom",{name,pass});
 }
 
@@ -146,22 +117,15 @@ function createRoom(){
 function send(){
   const m=document.getElementById("msg").value;
   if(!m) return;
-
   socket.emit("chatMessage",m);
-  addMsg(m,true);
-
   document.getElementById("msg").value="";
 }
 
-function addMsg(text,me){
-  const d=document.createElement("div");
-  d.className="msg "+(me?"me":"other");
-  d.innerText=text;
-  document.getElementById("messages").appendChild(d);
-}
-
 socket.on("message",m=>{
-  addMsg(m.text,false);
+  const d=document.createElement("div");
+  d.className="msg "+(m.user===username?"me":"other");
+  d.innerText=m.user+": "+m.text;
+  document.getElementById("messages").appendChild(d);
 });
 
 /* ENTER */
@@ -169,25 +133,72 @@ document.getElementById("msg").addEventListener("keypress",e=>{
   if(e.key==="Enter") send();
 });
 
-/* SCREEN (BASİT) */
+/* KALİTE */
+function getQuality(){
+  const q=document.getElementById("quality").value;
+
+  if(/Android|iPhone/i.test(navigator.userAgent)){
+    return {width:640,height:360,frameRate:15};
+  }
+
+  if(q==="low") return {width:640,height:360,frameRate:15};
+  if(q==="medium") return {width:1280,height:720,frameRate:25};
+  return {width:1920,height:1080,frameRate:30};
+}
+
+/* SCREEN */
 async function startScreen(){
   try{
     localStream = await navigator.mediaDevices.getDisplayMedia({
-      video:true,
+      video:getQuality(),
       audio:true
     });
 
     socket.emit("startScreen");
 
-    let v=document.createElement("video");
-    v.srcObject=localStream;
-    v.autoplay=true;
-    v.style.width="200px";
-    document.body.appendChild(v);
+    showVideo(localStream,true);
 
-  }catch(e){
-    alert("Ekran paylaşımı desteklenmiyor");
+    localStream.getVideoTracks()[0].onended = stopScreen;
+
+  }catch{
+    alert("Desteklenmiyor");
   }
+}
+
+function stopScreen(){
+  if(localStream){
+    localStream.getTracks().forEach(t=>t.stop());
+  }
+
+  socket.emit("stopScreen");
+
+  const v=document.getElementById("video");
+  if(v){
+    v.srcObject=null;
+    v.remove();
+  }
+}
+
+socket.on("screenStarted", ()=>{});
+
+socket.on("screenStopped", ()=>{
+  const v=document.getElementById("video");
+  if(v){
+    v.srcObject=null;
+    v.remove();
+  }
+});
+
+function showVideo(stream,muted=false){
+  let v=document.getElementById("video");
+  if(!v){
+    v=document.createElement("video");
+    v.id="video";
+    v.autoplay=true;
+    document.body.appendChild(v);
+  }
+  v.muted=muted;
+  v.srcObject=stream;
 }
 </script>
 
