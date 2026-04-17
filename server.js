@@ -9,7 +9,14 @@ let rooms = {};
 
 io.on("connection", socket => {
 
+  /* KULLANICI ADI */
+  socket.on("setName", name=>{
+    socket.username = name;
+  });
+
+  /* ODA OLUŞTUR */
   socket.on("createRoom", ({name, pass}) => {
+
     if(!name) return;
 
     if(rooms[name]){
@@ -20,17 +27,32 @@ io.on("connection", socket => {
     rooms[name] = {
       pass: pass || "",
       users: [],
-      stream:false
+      stream:false,
+      streamer:null
     };
+
+    /* kuran kişi direkt girsin */
+    socket.join(name);
+    socket.room = name;
+
+    rooms[name].users.push({
+      id:socket.id,
+      name:socket.username || "Kurucu"
+    });
+
+    io.to(name).emit("users", rooms[name].users.map(u=>u.name));
 
     updateRooms();
   });
 
+  /* ODA LİSTESİ */
   socket.on("getRooms", ()=>{
     updateRooms(socket);
   });
 
+  /* ODAYA GİR */
   socket.on("joinRoom", ({room, username, pass})=>{
+
     const r = rooms[room];
 
     if(r && r.pass === pass){
@@ -43,37 +65,54 @@ io.on("connection", socket => {
 
       io.to(room).emit("users", r.users.map(u=>u.name));
 
+      /* aktif yayın varsa bildir */
       if(r.stream){
-        socket.emit("screenStarted",{id:null});
+        socket.emit("screenStarted",{id:r.streamer});
       }
 
       updateRooms();
+
     }else{
       socket.emit("errorMsg","Şifre yanlış");
     }
   });
 
+  /* CHAT */
   socket.on("chatMessage", msg=>{
     if(socket.room){
       io.to(socket.room).emit("message",{
-        text: msg,
-        user: socket.username
+        text:msg,
+        user:socket.username
       });
     }
   });
 
-  /* EKRAN PAYLAŞ (BİLDİRİM) */
+  /* EKRAN BAŞLAT */
   socket.on("startScreen", ()=>{
     if(socket.room){
       rooms[socket.room].stream = true;
-      socket.to(socket.room).emit("screenStarted",{id:socket.id});
+      rooms[socket.room].streamer = socket.id;
+
+      io.to(socket.room).emit("screenStarted",{id:socket.id});
     }
   });
 
+  /* EKRAN DURDUR */
+  socket.on("stopScreen", ()=>{
+    if(socket.room){
+      rooms[socket.room].stream = false;
+      rooms[socket.room].streamer = null;
+
+      io.to(socket.room).emit("screenStopped");
+    }
+  });
+
+  /* ÇIKIŞ */
   socket.on("disconnect", ()=>{
     if(socket.room && rooms[socket.room]){
+
       rooms[socket.room].users =
-        rooms[socket.room].users.filter(u=>u.id !== socket.id);
+        rooms[socket.room].users.filter(u=>u.id!==socket.id);
 
       io.to(socket.room).emit("users",
         rooms[socket.room].users.map(u=>u.name)
