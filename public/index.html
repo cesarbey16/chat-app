@@ -1,214 +1,305 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat Pro Premium</title>
+
 <style>
-body{margin:0;display:flex;height:100vh;background:#0f172a;color:#fff;font-family:sans-serif}
-#sidebar{width:230px;background:#020617;padding:10px}
-#chat{flex:1;display:flex;flex-direction:column}
-#messages{flex:1;overflow:auto;padding:10px}
-#videos{display:flex;flex-wrap:wrap}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI;}
 
-.msg{padding:8px;margin:5px;border-radius:8px;max-width:60%}
-.me{background:#2563eb;margin-left:auto}
-.other{background:#1e293b}
+body{
+  display:flex;
+  height:100vh;
+  background:#0b0f19;
+  color:#fff;
+}
 
-video{width:250px;margin:5px;border-radius:10px;background:black}
+/* SOL PANEL */
+.sidebar{
+  width:280px;
+  background:#0f172a;
+  padding:15px;
+  border-right:1px solid #1e293b;
+  display:flex;
+  flex-direction:column;
+}
 
-#input{display:flex}
-#input input{flex:1;padding:10px}
-button{padding:6px;margin:3px}
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+}
 
-#streamInfo{padding:5px;font-weight:bold}
+.addBtn{
+  background:#22c55e;
+  border:none;
+  padding:5px 10px;
+  border-radius:6px;
+  cursor:pointer;
+}
 
-@media(max-width:768px){
- body{flex-direction:column}
- video{width:100%}
+.room{
+  background:#1e293b;
+  padding:10px;
+  border-radius:8px;
+  margin-bottom:5px;
+  cursor:pointer;
+}
+
+.room:hover{
+  background:#334155;
+}
+
+.users{
+  margin-top:auto;
+  font-size:12px;
+  opacity:.8;
+}
+
+/* CHAT */
+.chat{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+
+.header{
+  padding:10px;
+  border-bottom:1px solid #1e293b;
+  display:flex;
+  justify-content:space-between;
+}
+
+.messages{
+  flex:1;
+  overflow:auto;
+  padding:15px;
+}
+
+.msg{
+  max-width:65%;
+  padding:10px;
+  margin:6px 0;
+  border-radius:12px;
+  position:relative;
+}
+
+.me{
+  background:#22c55e;
+  margin-left:auto;
+}
+
+.other{
+  background:#1e293b;
+}
+
+.time{
+  font-size:10px;
+  opacity:.7;
+  position:absolute;
+  bottom:2px;
+  right:6px;
+}
+
+/* INPUT */
+.inputBox{
+  display:flex;
+  padding:10px;
+  background:#020617;
+}
+
+input{
+  flex:1;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+}
+
+button{
+  margin-left:10px;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  background:#22c55e;
+  color:white;
+  cursor:pointer;
+}
+
+/* MODAL */
+.modal{
+  position:fixed;
+  top:0;left:0;
+  width:100%;height:100%;
+  background:#000000aa;
+  display:none;
+  justify-content:center;
+  align-items:center;
+}
+
+.modalBox{
+  background:#0f172a;
+  padding:20px;
+  border-radius:10px;
+}
+
+.modal input{
+  margin:5px 0;
+  width:100%;
+}
+
+/* MOBİL */
+@media(max-width:700px){
+  .sidebar{display:none;}
 }
 </style>
 </head>
 
 <body>
 
-<div id="sidebar">
-<button onclick="createRoom()">Oda Kur</button>
+<div class="sidebar">
+
+<div class="top">
+  <h3>Odalar</h3>
+  <button class="addBtn" onclick="openModal()">+</button>
+</div>
+
 <div id="rooms"></div>
 
-<h4>Aktif</h4>
-<div id="users"></div>
+<div class="users" id="users"></div>
 
-<hr>
-<button onclick="startScreen()">Ekran Paylaş</button>
 </div>
 
-<div id="chat">
-<div id="streamInfo"></div>
-<div id="messages"></div>
-<div id="videos"></div>
+<div class="chat">
 
-<div id="input">
-<input id="msg" placeholder="Mesaj yaz...">
-<button onclick="send()">Gönder</button>
+<div class="header">
+  <span id="roomName">Genel</span>
+  <button onclick="startScreen()">📺</button>
 </div>
+
+<div class="messages" id="messages"></div>
+
+<div class="inputBox">
+  <input id="msg" placeholder="Mesaj yaz..." />
+  <button onclick="send()">➤</button>
+</div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal" id="modal">
+  <div class="modalBox">
+    <h3>Oda Kur</h3>
+    <input id="roomInput" placeholder="Oda adı">
+    <input id="passInput" placeholder="Şifre">
+    <button onclick="createRoom()">Oluştur</button>
+  </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+
 <script>
 const socket = io();
 
-let username = prompt("İsim:");
-let currentRoom = "";
-let peer;
-let stream;
+let username = prompt("İsmin?");
+let room = "";
 
-/* ENTER TUŞU FIX */
-window.onload = () => {
-  const input = document.getElementById("msg");
+socket.emit("getRooms");
 
-  input.addEventListener("keydown", function(e){
-    if(e.key === "Enter" && !e.shiftKey){
-      e.preventDefault();
-      send();
-    }
-  });
-};
-
-/* ROOMS */
-function createRoom(){
-  const room=prompt("Oda adı:");
-  const password=prompt("Şifre:");
-  socket.emit("create-room",{room,password,username});
-  currentRoom=room;
-}
-
-function joinRoom(r){
-  const password=prompt("Şifre:");
-  socket.emit("join-room",{room:r,password,username});
-  currentRoom=r;
-}
-
-/* LIST */
-socket.on("room-list",(rooms)=>{
-  const div=document.getElementById("rooms");
+/* ODA LİSTESİ */
+socket.on("rooms", (list)=>{
+  const div = document.getElementById("rooms");
   div.innerHTML="";
-  rooms.forEach(r=>{
-    div.innerHTML+=`<div onclick="joinRoom('${r}')">${r}</div>`;
+
+  list.forEach(r=>{
+    const el=document.createElement("div");
+    el.className="room";
+    el.innerText=r.name;
+    el.onclick=()=>joinRoom(r.name);
+    div.appendChild(el);
   });
 });
 
-socket.on("user-list",(rooms)=>{
-  const div=document.getElementById("users");
-  div.innerHTML="";
-  Object.keys(rooms).forEach(r=>{
-    rooms[r].users.forEach(u=>{
-      div.innerHTML+=u.username+"<br>";
-    });
-  });
-});
+/* ODAYA GİR */
+function joinRoom(name){
+  const pass = prompt("Şifre gir");
+  socket.emit("joinRoom",{room:name, username, pass});
+  room=name;
+  document.getElementById("roomName").innerText=name;
+}
 
-/* CHAT */
+/* MESAJ */
 function send(){
-  const m=document.getElementById("msg");
-  if(!m.value) return;
-  socket.emit("message",m.value);
-  m.value="";
+  const msg=document.getElementById("msg").value;
+  if(!msg) return;
+
+  socket.emit("chatMessage", msg);
+  addMsg(msg,true);
+
+  document.getElementById("msg").value="";
 }
 
-socket.on("message",(d)=>{
-  const div=document.getElementById("messages");
-  div.innerHTML+=`
-  <div class="msg ${d.username===username?"me":"other"}">
-    ${d.username}: ${d.msg}
-  </div>`;
+/* MESAJ GÖSTER */
+function addMsg(text, me){
+  const div=document.createElement("div");
+  div.className="msg "+(me?"me":"other");
+
+  const time=new Date().toLocaleTimeString().slice(0,5);
+
+  div.innerHTML=`${text}<div class="time">${time} ✔✔</div>`;
+
+  document.getElementById("messages").appendChild(div);
+}
+
+/* MESAJ AL */
+socket.on("message",(msg)=>{
+  addMsg(msg.text,false);
 });
 
-/* PEER */
-function createPeer(){
-  return new RTCPeerConnection({
-    iceServers:[{urls:"stun:stun.l.google.com:19302"}]
-  });
+/* ENTER */
+document.getElementById("msg").addEventListener("keypress",e=>{
+  if(e.key==="Enter") send();
+});
+
+/* ODA KUR */
+function openModal(){
+  document.getElementById("modal").style.display="flex";
 }
 
-/* SCREEN */
+function createRoom(){
+  const name=document.getElementById("roomInput").value;
+  const pass=document.getElementById("passInput").value;
+
+  socket.emit("createRoom",{name,pass});
+  document.getElementById("modal").style.display="none";
+}
+
+/* KULLANICILAR */
+socket.on("users",(list)=>{
+  document.getElementById("users").innerHTML=
+    "Aktif: "+list.join(", ");
+});
+
+/* EKRAN PAYLAŞ */
 async function startScreen(){
+  try{
+    const stream=await navigator.mediaDevices.getDisplayMedia({
+      video:true,
+      audio:true
+    });
 
-  document.getElementById("videos").innerHTML="";
+    const video=document.createElement("video");
+    video.srcObject=stream;
+    video.autoplay=true;
+    video.style.width="200px";
 
-  stream = await navigator.mediaDevices.getDisplayMedia({
-    video:true,
-    audio:true
-  });
+    document.body.appendChild(video);
 
-  peer=createPeer();
-
-  stream.getTracks().forEach(t=>peer.addTrack(t,stream));
-
-  peer.onicecandidate=e=>{
-    if(e.candidate) socket.emit("ice-candidate",e.candidate);
-  };
-
-  const offer=await peer.createOffer();
-  await peer.setLocalDescription(offer);
-  socket.emit("offer",offer);
-
-  socket.emit("start-stream");
-
-  stream.getVideoTracks()[0].onended=()=>{
-    document.getElementById("videos").innerHTML="";
-    socket.emit("stop-stream");
-    if(peer) peer.close();
-  };
+  }catch(e){
+    alert("Ekran paylaşım hatası");
+  }
 }
-
-/* YAYINCI */
-socket.on("stream-started",(data)=>{
-  document.getElementById("streamInfo").innerText="📺 Yayıncı: "+data.username;
-});
-
-socket.on("stream-stopped",()=>{
-  document.getElementById("videos").innerHTML="";
-  document.getElementById("streamInfo").innerText="";
-});
-
-/* HOST OFFER */
-socket.on("request-offer", async ()=>{
-  if(!peer) return;
-
-  const offer=await peer.createOffer();
-  await peer.setLocalDescription(offer);
-  socket.emit("offer",offer);
-});
-
-/* RECEIVE */
-socket.on("offer",async offer=>{
-  document.getElementById("videos").innerHTML="";
-
-  peer=createPeer();
-
-  peer.ontrack=e=>{
-    document.getElementById("videos").innerHTML="";
-
-    const v=document.createElement("video");
-    v.srcObject=e.streams[0];
-    v.autoplay=true;
-    v.controls=true;
-    v.playsInline=true;
-
-    document.getElementById("videos").appendChild(v);
-  };
-
-  peer.onicecandidate=e=>{
-    if(e.candidate) socket.emit("ice-candidate",e.candidate);
-  };
-
-  await peer.setRemoteDescription(offer);
-  const answer=await peer.createAnswer();
-  await peer.setLocalDescription(answer);
-  socket.emit("answer",answer);
-});
-
-socket.on("answer",a=>peer.setRemoteDescription(a));
-socket.on("ice-candidate",c=>peer.addIceCandidate(c));
 </script>
 
 </body>
