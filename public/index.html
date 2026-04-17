@@ -3,188 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chat Pro Premium</title>
+<title>Chat Pro</title>
 
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI}
-
-body{
-  display:flex;
-  height:100vh;
-  background:#0b0f19;
-  color:#fff;
-}
-
-/* SIDEBAR */
-.sidebar{
-  width:280px;
-  background:#0f172a;
-  padding:15px;
-  display:flex;
-  flex-direction:column;
-  border-right:1px solid #1e293b;
-}
-
-.top{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:10px;
-}
-
-.top button{
-  background:#22c55e;
-  border:none;
-  padding:6px 10px;
-  border-radius:6px;
-  cursor:pointer;
-}
-
-.room{
-  display:flex;
-  justify-content:space-between;
-  background:#1e293b;
-  padding:10px;
-  border-radius:10px;
-  margin-bottom:6px;
-  cursor:pointer;
-}
-
-.room:hover{background:#334155}
-.room.active{background:#22c55e}
-
-.badge{
-  background:#020617;
-  padding:2px 6px;
-  border-radius:6px;
-  font-size:12px;
-}
-
-.lock{color:#facc15}
-
-#online{margin-top:auto;font-size:13px;opacity:.7}
-
-/* CHAT */
-.chat{
-  flex:1;
-  display:flex;
-  flex-direction:column;
-}
-
-.header{
-  padding:10px;
-  border-bottom:1px solid #1e293b;
-}
-
-.messages{
-  flex:1;
-  overflow:auto;
-  padding:15px;
-}
-
-.msg{
-  max-width:65%;
-  padding:10px;
-  margin:6px 0;
-  border-radius:12px;
-  position:relative;
-}
-
+body{margin:0;font-family:sans-serif;background:#0b0f19;color:white}
+.sidebar{width:250px;background:#111;padding:10px;height:100vh;overflow:auto}
+.room{padding:10px;background:#222;margin:5px 0;border-radius:8px;cursor:pointer}
+.chat{flex:1;display:flex;flex-direction:column}
+.container{display:flex;height:100vh}
+.messages{flex:1;padding:10px;overflow:auto}
+.msg{margin:5px;padding:10px;border-radius:10px;max-width:70%}
 .me{background:#22c55e;margin-left:auto}
-.other{background:#1e293b}
+.other{background:#333}
+.inputBox{display:flex}
+input{flex:1;padding:10px}
+button{padding:10px}
 
-.time{
-  font-size:10px;
-  position:absolute;
-  bottom:2px;
-  right:6px;
-  opacity:.7;
-}
-
-.inputBox{
-  display:flex;
-  padding:10px;
-  background:#020617;
-}
-
-input{
-  flex:1;
-  padding:10px;
-  border:none;
-  border-radius:8px;
-}
-
-button{
-  margin-left:10px;
-  padding:10px;
-  border:none;
-  border-radius:8px;
-  background:#22c55e;
-  color:white;
-  cursor:pointer;
-}
-
-/* MODAL */
-.modal{
-  position:fixed;
-  width:100%;
-  height:100%;
-  background:#000000aa;
-  display:none;
-  justify-content:center;
-  align-items:center;
-}
-
-.modalBox{
-  background:#0f172a;
-  padding:20px;
-  border-radius:10px;
-}
-
-/* MOBİL */
 @media(max-width:700px){
-  .sidebar{display:none}
+.sidebar{display:none}
+.container{flex-direction:column}
 }
+video{width:100%}
 </style>
 </head>
 
 <body>
 
+<div class="container">
+
 <div class="sidebar">
-
-<div class="top">
-  <span>Odalar</span>
-  <div>
-    <button onclick="openModal()">+</button>
-    <button onclick="startScreen()">📺</button>
-  </div>
-</div>
-
-<div id="rooms"></div>
-<div id="online"></div>
-
+  <button onclick="openModal()">+</button>
+  <button onclick="startScreen()">📺</button>
+  <div id="rooms"></div>
+  <div id="users"></div>
 </div>
 
 <div class="chat">
-
-<div class="header" id="roomName">Oda seç</div>
-
-<div class="messages" id="messages"></div>
-
-<div class="inputBox">
-  <input id="msg" placeholder="Mesaj yaz...">
-  <button onclick="send()">➤</button>
-</div>
-
-</div>
-
-<div class="modal" id="modal">
-  <div class="modalBox">
-    <h3>Oda Kur</h3>
-    <input id="roomInput" placeholder="Oda adı"><br><br>
-    <input id="passInput" placeholder="Şifre"><br><br>
-    <button onclick="createRoom()">Oluştur</button>
+  <div class="messages" id="messages"></div>
+  <div class="inputBox">
+    <input id="msg">
+    <button onclick="send()">Gönder</button>
   </div>
+</div>
+
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -192,114 +53,107 @@ button{
 <script>
 const socket = io();
 
-let username = prompt("İsmin?");
-let currentRoom = "";
+let username = prompt("İsim");
+let room="";
+let peerConnections = {};
 let localStream;
 
-/* ODALAR */
-socket.on("rooms", (list)=>{
-  const div = document.getElementById("rooms");
+/* ROOMS */
+socket.emit("getRooms");
+
+socket.on("rooms", list=>{
+  const div=document.getElementById("rooms");
   div.innerHTML="";
-
   list.forEach(r=>{
-    const el = document.createElement("div");
-    el.className = "room" + (r.name===currentRoom?" active":"");
-
-    el.innerHTML = `
-      ${r.locked ? "🔒" : "🟢"} ${r.name}
-      <div class="badge">${r.count}</div>
-    `;
-
-    el.onclick = ()=>joinRoom(r.name);
+    const el=document.createElement("div");
+    el.className="room";
+    el.innerText=r.name+" ("+r.count+")";
+    el.onclick=()=>joinRoom(r.name);
     div.appendChild(el);
   });
 });
 
-/* ONLINE */
-socket.on("onlineCount", (n)=>{
-  document.getElementById("online").innerText = "Online: "+n;
+/* USERS */
+socket.on("users", list=>{
+  document.getElementById("users").innerText="👥 "+list.join(",");
 });
 
-/* ODAYA GİR */
+/* JOIN */
 function joinRoom(name){
-  const pass = prompt("Şifre gir");
-  socket.emit("joinRoom",{room:name, username, pass});
-  currentRoom = name;
-  document.getElementById("roomName").innerText = name;
+  const pass=prompt("Şifre");
+  socket.emit("joinRoom",{room:name,username,pass});
+  room=name;
 }
 
-/* MESAJ */
+/* CHAT */
 function send(){
-  const msg=document.getElementById("msg").value;
-  if(!msg) return;
-
-  socket.emit("chatMessage", msg);
-  addMsg(msg,true);
-
+  const m=document.getElementById("msg").value;
+  socket.emit("chatMessage",m);
+  addMsg(m,true);
   document.getElementById("msg").value="";
 }
 
-function addMsg(text, me){
-  const div=document.createElement("div");
-  div.className="msg "+(me?"me":"other");
-
-  const time=new Date().toLocaleTimeString().slice(0,5);
-
-  div.innerHTML=`${text}<div class="time">${time} ✔✔</div>`;
-  document.getElementById("messages").appendChild(div);
+function addMsg(t,me){
+  const d=document.createElement("div");
+  d.className="msg "+(me?"me":"other");
+  d.innerText=t;
+  document.getElementById("messages").appendChild(d);
 }
 
-socket.on("message",(msg)=>{
-  addMsg(msg.text,false);
-});
+socket.on("message",m=>addMsg(m.text,false));
 
-/* ENTER */
-document.getElementById("msg").addEventListener("keypress",e=>{
-  if(e.key==="Enter") send();
-});
+/* WEBRTC */
+const config={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};
 
-/* ODA KUR */
-function openModal(){
-  document.getElementById("modal").style.display="flex";
-}
-
-function createRoom(){
-  const name=document.getElementById("roomInput").value;
-  const pass=document.getElementById("passInput").value;
-
-  socket.emit("createRoom",{name,pass});
-  document.getElementById("modal").style.display="none";
-}
-
-/* EKRAN PAYLAŞ */
 async function startScreen(){
-  try{
-    localStream = await navigator.mediaDevices.getDisplayMedia({
-      video:true,
-      audio:true
-    });
-
-    socket.emit("startScreen");
-
-  }catch(e){
-    alert("Ekran paylaşım hatası");
-  }
+  localStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+  socket.emit("startScreen");
 }
 
-socket.on("screenStarted", ()=>{
-  const video=document.createElement("video");
-  video.id="screen";
-  video.autoplay=true;
-  video.style.width="300px";
-  document.body.appendChild(video);
+socket.on("screenStarted", async ({id})=>{
+  if(id===socket.id) return;
+
+  const pc=new RTCPeerConnection(config);
+  peerConnections[id]=pc;
+
+  pc.ontrack=e=>{
+    let v=document.getElementById("video");
+    if(!v){
+      v=document.createElement("video");
+      v.id="video";
+      v.autoplay=true;
+      document.body.appendChild(v);
+    }
+    v.srcObject=e.streams[0];
+  };
+
+  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  socket.emit("offer",{offer,to:id});
 });
 
-socket.on("screenStopped", ()=>{
-  document.getElementById("screen")?.remove();
+socket.on("offer", async ({offer,from})=>{
+  const pc=new RTCPeerConnection(config);
+  peerConnections[from]=pc;
+
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+
+  await pc.setRemoteDescription(offer);
+  const answer=await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+
+  socket.emit("answer",{answer,to:from});
 });
 
-/* LOAD */
-socket.emit("getRooms");
+socket.on("answer", async ({answer,from})=>{
+  await peerConnections[from].setRemoteDescription(answer);
+});
+
+socket.on("candidate", async ({candidate,from})=>{
+  if(peerConnections[from]){
+    await peerConnections[from].addIceCandidate(candidate);
+  }
+});
 </script>
 
 </body>
