@@ -9,11 +9,21 @@ let rooms = {};
 
 io.on("connection", socket => {
 
-  socket.on("createRoom", ({name, pass})=>{
-    if(!rooms[name]){
-      rooms[name] = {pass, users:[], stream:false};
-      updateRooms();
+  socket.on("createRoom", ({name, pass}) => {
+    if(!name) return;
+
+    if(rooms[name]){
+      socket.emit("errorMsg","Bu oda zaten var");
+      return;
     }
+
+    rooms[name] = {
+      pass: pass || "",
+      users: [],
+      stream:false
+    };
+
+    updateRooms();
   });
 
   socket.on("getRooms", ()=>{
@@ -21,42 +31,38 @@ io.on("connection", socket => {
   });
 
   socket.on("joinRoom", ({room, username, pass})=>{
-    if(rooms[room] && rooms[room].pass === pass){
+    const r = rooms[room];
+
+    if(r && r.pass === pass){
 
       socket.join(room);
       socket.room = room;
       socket.username = username;
 
-      rooms[room].users.push({id:socket.id, name:username});
+      r.users.push({id:socket.id, name:username});
 
-      io.to(room).emit("users", rooms[room].users.map(u=>u.name));
+      io.to(room).emit("users", r.users.map(u=>u.name));
 
-      if(rooms[room].stream){
+      if(r.stream){
         socket.emit("screenStarted",{id:null});
       }
 
       updateRooms();
+    }else{
+      socket.emit("errorMsg","Şifre yanlış");
     }
   });
 
   socket.on("chatMessage", msg=>{
-    io.to(socket.room).emit("message", {text:msg});
+    if(socket.room){
+      io.to(socket.room).emit("message",{
+        text: msg,
+        user: socket.username
+      });
+    }
   });
 
-  /* WEBRTC */
-  socket.on("offer", ({offer, to})=>{
-    io.to(to).emit("offer", {offer, from:socket.id});
-  });
-
-  socket.on("answer", ({answer, to})=>{
-    io.to(to).emit("answer", {answer, from:socket.id});
-  });
-
-  socket.on("candidate", ({candidate, to})=>{
-    io.to(to).emit("candidate", {candidate, from:socket.id});
-  });
-
-  /* SCREEN */
+  /* EKRAN PAYLAŞ (BİLDİRİM) */
   socket.on("startScreen", ()=>{
     if(socket.room){
       rooms[socket.room].stream = true;
@@ -67,9 +73,12 @@ io.on("connection", socket => {
   socket.on("disconnect", ()=>{
     if(socket.room && rooms[socket.room]){
       rooms[socket.room].users =
-        rooms[socket.room].users.filter(u=>u.id!==socket.id);
+        rooms[socket.room].users.filter(u=>u.id !== socket.id);
 
-      io.to(socket.room).emit("users", rooms[socket.room].users.map(u=>u.name));
+      io.to(socket.room).emit("users",
+        rooms[socket.room].users.map(u=>u.name)
+      );
+
       updateRooms();
     }
   });
@@ -78,14 +87,20 @@ io.on("connection", socket => {
     const data = Object.keys(rooms).map(r=>({
       name:r,
       count:rooms[r].users.length,
-      locked:!!rooms[r].pass
+      locked: !!rooms[r].pass
     }));
 
-    if(target) target.emit("rooms", data);
-    else io.emit("rooms", data);
+    if(target){
+      target.emit("rooms", data);
+    }else{
+      io.emit("rooms", data);
+    }
   }
 
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, ()=>console.log("Server çalışıyor:", PORT));
+
+http.listen(PORT, ()=>{
+  console.log("Server çalışıyor:", PORT);
+});
