@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chat Pro Premium</title>
+<title>Chat Premium</title>
 
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI;}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI}
 
 body{
   display:flex;
@@ -15,14 +15,14 @@ body{
   color:#fff;
 }
 
-/* SOL PANEL */
+/* SIDEBAR */
 .sidebar{
   width:280px;
   background:#0f172a;
   padding:15px;
-  border-right:1px solid #1e293b;
   display:flex;
   flex-direction:column;
+  border-right:1px solid #1e293b;
 }
 
 .top{
@@ -32,31 +32,37 @@ body{
   margin-bottom:10px;
 }
 
-.addBtn{
+.top button{
   background:#22c55e;
   border:none;
-  padding:5px 10px;
+  padding:6px 10px;
   border-radius:6px;
   cursor:pointer;
 }
 
 .room{
+  display:flex;
+  justify-content:space-between;
   background:#1e293b;
   padding:10px;
-  border-radius:8px;
-  margin-bottom:5px;
+  border-radius:10px;
+  margin-bottom:6px;
   cursor:pointer;
 }
 
-.room:hover{
-  background:#334155;
+.room:hover{background:#334155}
+.room.active{background:#22c55e}
+
+.badge{
+  background:#020617;
+  padding:2px 6px;
+  border-radius:6px;
+  font-size:12px;
 }
 
-.users{
-  margin-top:auto;
-  font-size:12px;
-  opacity:.8;
-}
+.lock{color:#facc15}
+
+#online{margin-top:auto;font-size:13px;opacity:.7}
 
 /* CHAT */
 .chat{
@@ -68,8 +74,6 @@ body{
 .header{
   padding:10px;
   border-bottom:1px solid #1e293b;
-  display:flex;
-  justify-content:space-between;
 }
 
 .messages{
@@ -86,24 +90,17 @@ body{
   position:relative;
 }
 
-.me{
-  background:#22c55e;
-  margin-left:auto;
-}
-
-.other{
-  background:#1e293b;
-}
+.me{background:#22c55e;margin-left:auto}
+.other{background:#1e293b}
 
 .time{
   font-size:10px;
-  opacity:.7;
   position:absolute;
   bottom:2px;
   right:6px;
+  opacity:.7;
 }
 
-/* INPUT */
 .inputBox{
   display:flex;
   padding:10px;
@@ -130,8 +127,8 @@ button{
 /* MODAL */
 .modal{
   position:fixed;
-  top:0;left:0;
-  width:100%;height:100%;
+  width:100%;
+  height:100%;
   background:#000000aa;
   display:none;
   justify-content:center;
@@ -144,14 +141,9 @@ button{
   border-radius:10px;
 }
 
-.modal input{
-  margin:5px 0;
-  width:100%;
-}
-
 /* MOBİL */
 @media(max-width:700px){
-  .sidebar{display:none;}
+  .sidebar{display:none}
 }
 </style>
 </head>
@@ -161,38 +153,36 @@ button{
 <div class="sidebar">
 
 <div class="top">
-  <h3>Odalar</h3>
-  <button class="addBtn" onclick="openModal()">+</button>
+  <span>Odalar</span>
+  <div>
+    <button onclick="openModal()">+</button>
+    <button onclick="startScreen()">📺</button>
+  </div>
 </div>
 
 <div id="rooms"></div>
-
-<div class="users" id="users"></div>
+<div id="online"></div>
 
 </div>
 
 <div class="chat">
 
-<div class="header">
-  <span id="roomName">Genel</span>
-  <button onclick="startScreen()">📺</button>
-</div>
+<div class="header" id="roomName">Oda seç</div>
 
 <div class="messages" id="messages"></div>
 
 <div class="inputBox">
-  <input id="msg" placeholder="Mesaj yaz..." />
+  <input id="msg" placeholder="Mesaj yaz...">
   <button onclick="send()">➤</button>
 </div>
 
 </div>
 
-<!-- MODAL -->
 <div class="modal" id="modal">
   <div class="modalBox">
     <h3>Oda Kur</h3>
-    <input id="roomInput" placeholder="Oda adı">
-    <input id="passInput" placeholder="Şifre">
+    <input id="roomInput" placeholder="Oda adı"><br><br>
+    <input id="passInput" placeholder="Şifre"><br><br>
     <button onclick="createRoom()">Oluştur</button>
   </div>
 </div>
@@ -203,30 +193,39 @@ button{
 const socket = io();
 
 let username = prompt("İsmin?");
-let room = "";
+let currentRoom = "";
+let localStream;
 
-socket.emit("getRooms");
-
-/* ODA LİSTESİ */
+/* ODALAR */
 socket.on("rooms", (list)=>{
   const div = document.getElementById("rooms");
   div.innerHTML="";
 
   list.forEach(r=>{
-    const el=document.createElement("div");
-    el.className="room";
-    el.innerText=r.name;
-    el.onclick=()=>joinRoom(r.name);
+    const el = document.createElement("div");
+    el.className = "room" + (r.name===currentRoom?" active":"");
+
+    el.innerHTML = `
+      ${r.locked ? "🔒" : "🟢"} ${r.name}
+      <div class="badge">${r.count}</div>
+    `;
+
+    el.onclick = ()=>joinRoom(r.name);
     div.appendChild(el);
   });
+});
+
+/* ONLINE */
+socket.on("onlineCount", (n)=>{
+  document.getElementById("online").innerText = "Online: "+n;
 });
 
 /* ODAYA GİR */
 function joinRoom(name){
   const pass = prompt("Şifre gir");
   socket.emit("joinRoom",{room:name, username, pass});
-  room=name;
-  document.getElementById("roomName").innerText=name;
+  currentRoom = name;
+  document.getElementById("roomName").innerText = name;
 }
 
 /* MESAJ */
@@ -240,7 +239,6 @@ function send(){
   document.getElementById("msg").value="";
 }
 
-/* MESAJ GÖSTER */
 function addMsg(text, me){
   const div=document.createElement("div");
   div.className="msg "+(me?"me":"other");
@@ -248,11 +246,9 @@ function addMsg(text, me){
   const time=new Date().toLocaleTimeString().slice(0,5);
 
   div.innerHTML=`${text}<div class="time">${time} ✔✔</div>`;
-
   document.getElementById("messages").appendChild(div);
 }
 
-/* MESAJ AL */
 socket.on("message",(msg)=>{
   addMsg(msg.text,false);
 });
@@ -275,31 +271,35 @@ function createRoom(){
   document.getElementById("modal").style.display="none";
 }
 
-/* KULLANICILAR */
-socket.on("users",(list)=>{
-  document.getElementById("users").innerHTML=
-    "Aktif: "+list.join(", ");
-});
-
 /* EKRAN PAYLAŞ */
 async function startScreen(){
   try{
-    const stream=await navigator.mediaDevices.getDisplayMedia({
+    localStream = await navigator.mediaDevices.getDisplayMedia({
       video:true,
       audio:true
     });
 
-    const video=document.createElement("video");
-    video.srcObject=stream;
-    video.autoplay=true;
-    video.style.width="200px";
-
-    document.body.appendChild(video);
+    socket.emit("startScreen");
 
   }catch(e){
     alert("Ekran paylaşım hatası");
   }
 }
+
+socket.on("screenStarted", ()=>{
+  const video=document.createElement("video");
+  video.id="screen";
+  video.autoplay=true;
+  video.style.width="300px";
+  document.body.appendChild(video);
+});
+
+socket.on("screenStopped", ()=>{
+  document.getElementById("screen")?.remove();
+});
+
+/* LOAD */
+socket.emit("getRooms");
 </script>
 
 </body>
