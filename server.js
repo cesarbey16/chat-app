@@ -13,6 +13,7 @@ io.on("connection", socket => {
     socket.username = name;
   });
 
+  /* ODA OLUŞTUR */
   socket.on("createRoom", ({name, pass})=>{
     if(rooms[name]) return;
 
@@ -25,41 +26,65 @@ io.on("connection", socket => {
     socket.join(name);
     socket.room = name;
 
-    rooms[name].users.push(socket.id);
+    rooms[name].users.push({
+      id:socket.id,
+      name:socket.username
+    });
 
-    updateRooms();
+    io.to(name).emit("users",
+      rooms[name].users.map(u=>u.name)
+    );
+
+    sendRooms();
   });
 
+  /* ODAYA GİR */
   socket.on("joinRoom", ({room, username, pass})=>{
     const r = rooms[room];
+
     if(r && r.pass === pass){
 
       socket.join(room);
       socket.room = room;
       socket.username = username;
 
-      r.users.push(socket.id);
+      r.users.push({id:socket.id, name:username});
 
-      // 🔥 Eğer yayın varsa yeni gelene söyle
+      io.to(room).emit("users",
+        r.users.map(u=>u.name)
+      );
+
       if(r.streamer){
         socket.emit("watchStream", r.streamer);
       }
 
-      updateRooms();
+      sendRooms();
     }
   });
 
-  /* STREAM BAŞLAT */
+  /* ODA LİSTESİ */
+  socket.on("getRooms", ()=>{
+    sendRooms(socket);
+  });
+
+  /* CHAT */
+  socket.on("chatMessage", msg=>{
+    if(socket.room){
+      io.to(socket.room).emit("message",{
+        text:msg,
+        user:socket.username
+      });
+    }
+  });
+
+  /* STREAM */
   socket.on("startStream", ()=>{
     if(socket.room){
       rooms[socket.room].streamer = socket.id;
-
-      // herkese bildir
       socket.to(socket.room).emit("newStreamer", socket.id);
     }
   });
 
-  /* VIEWER → STREAMER */
   socket.on("watchStream", (streamerId)=>{
     io.to(streamerId).emit("viewerJoined", socket.id);
   });
@@ -77,26 +102,38 @@ io.on("connection", socket => {
     io.to(to).emit("candidate",{from:socket.id, candidate});
   });
 
+  /* ÇIKIŞ */
   socket.on("disconnect", ()=>{
     if(socket.room && rooms[socket.room]){
       const r = rooms[socket.room];
 
-      r.users = r.users.filter(id=>id!==socket.id);
+      r.users = r.users.filter(u=>u.id !== socket.id);
+
+      io.to(socket.room).emit("users",
+        r.users.map(u=>u.name)
+      );
 
       if(r.streamer === socket.id){
         r.streamer = null;
         io.to(socket.room).emit("streamEnded");
       }
 
-      updateRooms();
+      sendRooms();
     }
   });
 
-  function updateRooms(){
-    io.emit("rooms", Object.keys(rooms).map(r=>({
+  function sendRooms(target){
+    const data = Object.keys(rooms).map(r=>({
       name:r,
-      count:rooms[r].users.length
-    })));
+      count:rooms[r].users.length,
+      locked: !!rooms[r].pass
+    }));
+
+    if(target){
+      target.emit("rooms", data);
+    }else{
+      io.emit("rooms", data);
+    }
   }
 
 });
