@@ -6,11 +6,11 @@
 <title>Chat Pro</title>
 
 <style>
-body{margin:0;font-family:sans-serif;background:#0b0f19;color:#fff}
+body{margin:0;background:#0b0f19;color:#fff;font-family:sans-serif}
 .container{display:flex;height:100vh}
 
 .sidebar{width:250px;background:#111;padding:10px}
-.room{padding:10px;background:#222;margin:5px 0;border-radius:8px}
+.room{padding:10px;background:#222;margin:5px 0;border-radius:8px;cursor:pointer}
 
 .chat{flex:1;display:flex;flex-direction:column}
 .messages{flex:1;padding:10px;overflow:auto}
@@ -23,25 +23,45 @@ body{margin:0;font-family:sans-serif;background:#0b0f19;color:#fff}
 input{flex:1;padding:10px}
 button{padding:10px}
 
-video{position:fixed;right:10px;top:10px;width:220px}
+/* VIDEO */
+video{
+  position:fixed;
+  right:10px;
+  top:10px;
+  width:220px;
+  border-radius:10px;
+  background:black;
+}
+
+/* FULLSCREEN */
+video.fullscreen{
+  position:fixed !important;
+  top:0;left:0;
+  width:100vw !important;
+  height:100vh !important;
+  object-fit:contain;
+  z-index:9999;
+}
+
+/* FULLSCREEN BUTTON */
+#fsBtn{
+  position:fixed;
+  bottom:80px;
+  right:10px;
+  z-index:10000;
+  padding:10px;
+}
 
 /* MOBİL */
 #topbar{display:none;background:#111;padding:10px;justify-content:space-between}
 #mobileMenu{
-  position:fixed;
-  left:-100%;
-  top:0;
-  width:80%;
-  height:100%;
-  background:#111;
-  transition:0.3s;
-  z-index:999;
+  position:fixed;left:-100%;top:0;width:80%;height:100%;
+  background:#111;transition:0.3s;z-index:999;
 }
 #mobileMenu.active{left:0}
 
 #overlay{
-  position:fixed;
-  width:100%;height:100%;
+  position:fixed;width:100%;height:100%;
   background:rgba(0,0,0,0.5);
   display:none;
 }
@@ -91,6 +111,8 @@ video{position:fixed;right:10px;top:10px;width:220px}
 
 </div>
 
+<button id="fsBtn" onclick="forceFullScreen()">⛶</button>
+
 <script src="/socket.io/socket.io.js"></script>
 
 <script>
@@ -103,39 +125,36 @@ let peerConnections={};
 
 /* MENU */
 function toggleMenu(){
-  document.getElementById("mobileMenu").classList.toggle("active");
-  document.getElementById("overlay").classList.toggle("active");
+  mobileMenu.classList.toggle("active");
+  overlay.classList.toggle("active");
 }
 function closeMenu(){
-  document.getElementById("mobileMenu").classList.remove("active");
-  document.getElementById("overlay").classList.remove("active");
+  mobileMenu.classList.remove("active");
+  overlay.classList.remove("active");
 }
 
 /* ROOMS */
 socket.emit("getRooms");
 
 socket.on("rooms", list=>{
-  const d=document.getElementById("rooms");
-  const m=document.getElementById("roomsMobile");
-
-  d.innerHTML="";
-  m.innerHTML="";
+  rooms.innerHTML="";
+  roomsMobile.innerHTML="";
 
   list.forEach(r=>{
-    const el=document.createElement("div");
+    let el=document.createElement("div");
     el.className="room";
     el.innerText=r.name+" ("+r.count+")";
     el.onclick=()=>joinRoom(r.name);
 
-    d.appendChild(el.cloneNode(true));
-    m.appendChild(el);
+    rooms.appendChild(el.cloneNode(true));
+    roomsMobile.appendChild(el);
   });
 });
 
 /* USERS */
 socket.on("users", list=>{
-  document.getElementById("users").innerText=list.join(", ");
-  document.getElementById("usersMobile").innerText=list.join(", ");
+  users.innerText=list.join(", ");
+  usersMobile.innerText=list.join(", ");
 });
 
 /* JOIN */
@@ -154,20 +173,20 @@ function createRoom(){
 
 /* CHAT */
 function send(){
-  const m=document.getElementById("msg").value;
+  let m=msg.value;
   if(!m) return;
   socket.emit("chatMessage",m);
-  document.getElementById("msg").value="";
+  msg.value="";
 }
 
 socket.on("message",m=>{
-  const d=document.createElement("div");
+  let d=document.createElement("div");
   d.className="msg "+(m.user===username?"me":"other");
   d.innerText=m.user+": "+m.text;
-  document.getElementById("messages").appendChild(d);
+  messages.appendChild(d);
 });
 
-document.getElementById("msg").addEventListener("keypress",e=>{
+msg.addEventListener("keypress",e=>{
   if(e.key==="Enter") send();
 });
 
@@ -239,18 +258,36 @@ socket.on("candidate",({from,candidate})=>{
 
 socket.on("streamEnded",()=>{
   const v=document.getElementById("video");
-  if(v){
-    v.srcObject=null;
-    v.remove();
-  }
+  if(v){v.remove();}
 });
 
+/* FULLSCREEN */
+function toggleFullScreen(v){
+  if(!document.fullscreenElement){
+    v.requestFullscreen();
+    v.classList.add("fullscreen");
+  }else{
+    document.exitFullscreen();
+    v.classList.remove("fullscreen");
+  }
+}
+function forceFullScreen(){
+  let v=document.getElementById("video");
+  if(v) toggleFullScreen(v);
+}
+
+/* VIDEO */
 function showVideo(stream,muted=false){
   let v=document.getElementById("video");
   if(!v){
     v=document.createElement("video");
     v.id="video";
     v.autoplay=true;
+    v.playsInline=true;
+
+    v.onclick=()=>toggleFullScreen(v);
+    v.ondblclick=()=>toggleFullScreen(v);
+
     document.body.appendChild(v);
   }
   v.muted=muted;
