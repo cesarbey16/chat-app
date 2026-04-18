@@ -1,269 +1,146 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chat Pro</title>
+const express = require("express");
+const app = express();
+const http = require("http").createServer(app);
+const io = require("socket.io")(http);
 
-<style>
-body{margin:0;font-family:sans-serif;background:#0b0f19;color:#fff}
-.container{display:flex;height:100vh}
+app.use(express.static("public"));
 
-/* SIDEBAR */
-.sidebar{width:250px;background:#111;padding:10px}
-.room{padding:10px;background:#222;margin:5px 0;border-radius:8px;cursor:pointer}
+let rooms = {};
 
-/* CHAT */
-.chat{flex:1;display:flex;flex-direction:column}
-.messages{flex:1;padding:10px;overflow:auto}
-.msg{margin:5px;padding:10px;border-radius:10px}
-.me{background:#22c55e;margin-left:auto}
-.other{background:#333}
+io.on("connection", socket => {
 
-.inputBox{display:flex}
-input{flex:1;padding:10px}
-button{padding:10px}
-
-/* VIDEO */
-video{position:fixed;right:10px;top:10px;width:220px}
-
-/* MOBILE */
-#topbar{display:none;background:#111;padding:10px;justify-content:space-between}
-#mobileMenu{
-  position:fixed;
-  left:-100%;
-  top:0;
-  width:80%;
-  height:100%;
-  background:#111;
-  transition:0.3s;
-  z-index:999;
-}
-#mobileMenu.active{left:0}
-
-#overlay{
-  position:fixed;
-  top:0;left:0;
-  width:100%;height:100%;
-  background:rgba(0,0,0,0.5);
-  display:none;
-  z-index:998;
-}
-#overlay.active{display:block}
-
-@media(max-width:700px){
-  .sidebar{display:none}
-  #topbar{display:flex}
-  .inputBox{position:fixed;bottom:0;width:100%}
-}
-</style>
-</head>
-
-<body>
-
-<div id="topbar">
-  <button onclick="toggleMenu()">☰</button>
-  <span>Chat</span>
-  <button onclick="startScreen()">📺</button>
-</div>
-
-<div id="mobileMenu">
-  <button onclick="createRoom()">+ Oda</button>
-  <div id="roomsMobile"></div>
-  <div id="usersMobile"></div>
-</div>
-
-<div id="overlay" onclick="closeMenu()"></div>
-
-<div class="container">
-
-<div class="sidebar">
-  <button onclick="createRoom()">+ Oda</button>
-  <button onclick="startScreen()">📺</button>
-  <div id="rooms"></div>
-  <div id="users"></div>
-</div>
-
-<div class="chat">
-  <div class="messages" id="messages"></div>
-
-  <div class="inputBox">
-    <input id="msg">
-    <button onclick="send()">Gönder</button>
-  </div>
-</div>
-
-</div>
-
-<script src="/socket.io/socket.io.js"></script>
-
-<script>
-const socket = io();
-
-let username = prompt("İsmin");
-socket.emit("setName", username);
-
-let localStream;
-let peerConnections={};
-
-/* MENU */
-function toggleMenu(){
-  document.getElementById("mobileMenu").classList.toggle("active");
-  document.getElementById("overlay").classList.toggle("active");
-}
-function closeMenu(){
-  document.getElementById("mobileMenu").classList.remove("active");
-  document.getElementById("overlay").classList.remove("active");
-}
-
-/* ROOMS */
-socket.emit("getRooms");
-
-socket.on("rooms", list=>{
-  const d=document.getElementById("rooms");
-  const m=document.getElementById("roomsMobile");
-
-  d.innerHTML="";
-  m.innerHTML="";
-
-  list.forEach(r=>{
-    const el=document.createElement("div");
-    el.className="room";
-    el.innerText=r.name+" ("+r.count+")";
-    el.onclick=()=>joinRoom(r.name);
-
-    d.appendChild(el.cloneNode(true));
-    m.appendChild(el);
-  });
-});
-
-/* USERS */
-socket.on("users", list=>{
-  document.getElementById("users").innerText=list.join(", ");
-  document.getElementById("usersMobile").innerText=list.join(", ");
-});
-
-/* JOIN */
-function joinRoom(name){
-  const pass=prompt("Şifre");
-  socket.emit("joinRoom",{room:name,username,pass});
-  closeMenu();
-}
-
-/* CREATE */
-function createRoom(){
-  const name=prompt("Oda adı");
-  const pass=prompt("Şifre");
-  socket.emit("createRoom",{name,pass});
-}
-
-/* CHAT */
-function send(){
-  const m=document.getElementById("msg").value;
-  if(!m) return;
-  socket.emit("chatMessage",m);
-  document.getElementById("msg").value="";
-}
-
-socket.on("message",m=>{
-  const d=document.createElement("div");
-  d.className="msg "+(m.user===username?"me":"other");
-  d.innerText=m.user+": "+m.text;
-  document.getElementById("messages").appendChild(d);
-});
-
-/* ENTER */
-document.getElementById("msg").addEventListener("keypress",e=>{
-  if(e.key==="Enter") send();
-});
-
-/* WEBRTC */
-const config={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};
-
-async function startScreen(){
-  localStream = await navigator.mediaDevices.getDisplayMedia({
-    video:true,audio:true
+  socket.on("setName", name=>{
+    socket.username = name;
   });
 
-  socket.emit("startStream");
-  showVideo(localStream,true);
-}
+  /* ODA OLUŞTUR */
+  socket.on("createRoom", ({name, pass})=>{
+    if(rooms[name]) return;
 
-socket.on("viewerJoined", async id=>{
-  const pc=new RTCPeerConnection(config);
-  peerConnections[id]=pc;
+    rooms[name] = {
+      pass: pass || "",
+      users: [],
+      streamer: null
+    };
 
-  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+    socket.join(name);
+    socket.room = name;
 
-  pc.onicecandidate=e=>{
-    if(e.candidate){
-      socket.emit("candidate",{to:id,candidate:e.candidate});
+    rooms[name].users.push({
+      id:socket.id,
+      name:socket.username
+    });
+
+    io.to(name).emit("users",
+      rooms[name].users.map(u=>u.name)
+    );
+
+    sendRooms();
+  });
+
+  /* ODAYA GİR */
+  socket.on("joinRoom", ({room, username, pass})=>{
+    const r = rooms[room];
+
+    if(r && r.pass === pass){
+
+      socket.join(room);
+      socket.room = room;
+      socket.username = username;
+
+      r.users.push({id:socket.id, name:username});
+
+      io.to(room).emit("users",
+        r.users.map(u=>u.name)
+      );
+
+      if(r.streamer){
+        socket.emit("watchStream", r.streamer);
+      }
+
+      sendRooms();
     }
-  };
+  });
 
-  const offer=await pc.createOffer();
-  await pc.setLocalDescription(offer);
+  /* ODA LİSTESİ */
+  socket.on("getRooms", ()=>{
+    sendRooms(socket);
+  });
 
-  socket.emit("offer",{to:id,offer});
-});
-
-socket.on("watchStream", id=>{
-  socket.emit("watchStream",id);
-});
-
-socket.on("newStreamer", id=>{
-  socket.emit("watchStream",id);
-});
-
-socket.on("offer", async ({from,offer})=>{
-  const pc=new RTCPeerConnection(config);
-  peerConnections[from]=pc;
-
-  pc.ontrack=e=>showVideo(e.streams[0]);
-
-  pc.onicecandidate=e=>{
-    if(e.candidate){
-      socket.emit("candidate",{to:from,candidate:e.candidate});
+  /* CHAT */
+  socket.on("chatMessage", msg=>{
+    if(socket.room){
+      io.to(socket.room).emit("message",{
+        text:msg,
+        user:socket.username
+      });
     }
-  };
+  });
 
-  await pc.setRemoteDescription(offer);
+  /* STREAM */
+  socket.on("startStream", ()=>{
+    if(socket.room){
+      rooms[socket.room].streamer = socket.id;
+      socket.to(socket.room).emit("newStreamer", socket.id);
+    }
+  });
 
-  const answer=await pc.createAnswer();
-  await pc.setLocalDescription(answer);
+  socket.on("watchStream", (streamerId)=>{
+    io.to(streamerId).emit("viewerJoined", socket.id);
+  });
 
-  socket.emit("answer",{to:from,answer});
-});
+  /* WEBRTC */
+  socket.on("offer", ({to, offer})=>{
+    io.to(to).emit("offer",{from:socket.id, offer});
+  });
 
-socket.on("answer",({from,answer})=>{
-  peerConnections[from].setRemoteDescription(answer);
-});
+  socket.on("answer", ({to, answer})=>{
+    io.to(to).emit("answer",{from:socket.id, answer});
+  });
 
-socket.on("candidate",({from,candidate})=>{
-  peerConnections[from].addIceCandidate(candidate);
-});
+  socket.on("candidate", ({to, candidate})=>{
+    io.to(to).emit("candidate",{from:socket.id, candidate});
+  });
 
-socket.on("streamEnded",()=>{
-  const v=document.getElementById("video");
-  if(v){
-    v.srcObject=null;
-    v.remove();
+  /* ÇIKIŞ */
+  socket.on("disconnect", ()=>{
+    if(socket.room && rooms[socket.room]){
+      const r = rooms[socket.room];
+
+      r.users = r.users.filter(u=>u.id !== socket.id);
+
+      // 🔥 ODA BOŞSA SİL
+      if(r.users.length === 0){
+        delete rooms[socket.room];
+      }else{
+        io.to(socket.room).emit("users",
+          r.users.map(u=>u.name)
+        );
+      }
+
+      if(r.streamer === socket.id){
+        r.streamer = null;
+        io.to(socket.room).emit("streamEnded");
+      }
+
+      sendRooms();
+    }
+  });
+
+  function sendRooms(target){
+    const data = Object.keys(rooms).map(r=>({
+      name:r,
+      count:rooms[r].users.length,
+      locked: !!rooms[r].pass
+    }));
+
+    if(target){
+      target.emit("rooms", data);
+    }else{
+      io.emit("rooms", data);
+    }
   }
+
 });
 
-/* VIDEO */
-function showVideo(stream,muted=false){
-  let v=document.getElementById("video");
-  if(!v){
-    v=document.createElement("video");
-    v.id="video";
-    v.autoplay=true;
-    document.body.appendChild(v);
-  }
-  v.muted=muted;
-  v.srcObject=stream;
-}
-</script>
-
-</body>
-</html>
+http.listen(3000, ()=>console.log("Server çalışıyor"));
