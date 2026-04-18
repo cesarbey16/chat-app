@@ -13,46 +13,31 @@ io.on("connection", socket => {
     socket.username = name;
   });
 
-  /* ODA OLUŞTUR */
   socket.on("createRoom", ({name, pass})=>{
     if(rooms[name]) return;
 
-    rooms[name] = {
-      pass: pass || "",
-      users: [],
-      streamer: null
-    };
+    rooms[name] = { pass: pass || "", users: [], streamer:null };
 
     socket.join(name);
     socket.room = name;
 
-    rooms[name].users.push({
-      id:socket.id,
-      name:socket.username
-    });
+    rooms[name].users.push({id:socket.id,name:socket.username});
 
-    io.to(name).emit("users",
-      rooms[name].users.map(u=>u.name)
-    );
-
+    io.to(name).emit("users", rooms[name].users.map(u=>u.name));
     sendRooms();
   });
 
-  /* ODAYA GİR */
   socket.on("joinRoom", ({room, username, pass})=>{
     const r = rooms[room];
-
     if(r && r.pass === pass){
 
       socket.join(room);
       socket.room = room;
       socket.username = username;
 
-      r.users.push({id:socket.id, name:username});
+      r.users.push({id:socket.id,name:username});
 
-      io.to(room).emit("users",
-        r.users.map(u=>u.name)
-      );
+      io.to(room).emit("users", r.users.map(u=>u.name));
 
       if(r.streamer){
         socket.emit("watchStream", r.streamer);
@@ -62,22 +47,14 @@ io.on("connection", socket => {
     }
   });
 
-  /* ODA LİSTESİ */
-  socket.on("getRooms", ()=>{
-    sendRooms(socket);
-  });
+  socket.on("getRooms", ()=>sendRooms(socket));
 
-  /* CHAT */
   socket.on("chatMessage", msg=>{
     if(socket.room){
-      io.to(socket.room).emit("message",{
-        text:msg,
-        user:socket.username
-      });
+      io.to(socket.room).emit("message",{text:msg,user:socket.username});
     }
   });
 
-  /* STREAM */
   socket.on("startStream", ()=>{
     if(socket.room){
       rooms[socket.room].streamer = socket.id;
@@ -85,37 +62,32 @@ io.on("connection", socket => {
     }
   });
 
-  socket.on("watchStream", (streamerId)=>{
-    io.to(streamerId).emit("viewerJoined", socket.id);
+  socket.on("watchStream", id=>{
+    io.to(id).emit("viewerJoined", socket.id);
   });
 
-  /* WEBRTC */
   socket.on("offer", ({to, offer})=>{
-    io.to(to).emit("offer",{from:socket.id, offer});
+    io.to(to).emit("offer",{from:socket.id,offer});
   });
 
   socket.on("answer", ({to, answer})=>{
-    io.to(to).emit("answer",{from:socket.id, answer});
+    io.to(to).emit("answer",{from:socket.id,answer});
   });
 
   socket.on("candidate", ({to, candidate})=>{
-    io.to(to).emit("candidate",{from:socket.id, candidate});
+    io.to(to).emit("candidate",{from:socket.id,candidate});
   });
 
-  /* ÇIKIŞ */
   socket.on("disconnect", ()=>{
     if(socket.room && rooms[socket.room]){
       const r = rooms[socket.room];
 
       r.users = r.users.filter(u=>u.id !== socket.id);
 
-      // 🔥 ODA BOŞSA SİL
       if(r.users.length === 0){
         delete rooms[socket.room];
       }else{
-        io.to(socket.room).emit("users",
-          r.users.map(u=>u.name)
-        );
+        io.to(socket.room).emit("users", r.users.map(u=>u.name));
       }
 
       if(r.streamer === socket.id){
@@ -131,14 +103,10 @@ io.on("connection", socket => {
     const data = Object.keys(rooms).map(r=>({
       name:r,
       count:rooms[r].users.length,
-      locked: !!rooms[r].pass
+      locked:!!rooms[r].pass
     }));
 
-    if(target){
-      target.emit("rooms", data);
-    }else{
-      io.emit("rooms", data);
-    }
+    target ? target.emit("rooms", data) : io.emit("rooms", data);
   }
 
 });
