@@ -7,41 +7,113 @@
 
 <style>
 body{margin:0;font-family:sans-serif;background:#0b0f19;color:white}
-.container{display:flex;height:100vh}
 
-.sidebar{width:250px;background:#111;padding:10px;overflow:auto}
-.room{padding:10px;background:#222;margin:5px 0;border-radius:8px;cursor:pointer}
-.room:hover{background:#333}
+/* TOP BAR */
+#topbar{
+  display:none;
+  background:#111;
+  padding:10px;
+  align-items:center;
+  justify-content:space-between;
+}
 
-.chat{flex:1;display:flex;flex-direction:column}
-.messages{flex:1;padding:10px;overflow:auto}
+#menuBtn{
+  font-size:20px;
+}
 
-.msg{margin:5px;padding:10px;border-radius:10px;max-width:70%}
+/* MENU */
+#mobileMenu{
+  position:fixed;
+  top:0;
+  left:-100%;
+  width:80%;
+  height:100%;
+  background:#111;
+  transition:0.3s;
+  z-index:999;
+  padding:10px;
+  overflow:auto;
+}
+
+#mobileMenu.active{
+  left:0;
+}
+
+/* CHAT */
+.messages{
+  height:calc(100vh - 70px);
+  overflow:auto;
+  padding:10px;
+}
+
+.msg{
+  margin:5px;
+  padding:10px;
+  border-radius:10px;
+  max-width:80%;
+}
+
 .me{background:#22c55e;margin-left:auto}
 .other{background:#333}
 
-.inputBox{display:flex}
-input{flex:1;padding:10px}
-button{padding:10px}
+/* INPUT */
+.inputBox{
+  position:fixed;
+  bottom:0;
+  width:100%;
+  display:flex;
+  background:#111;
+}
 
-video{position:fixed;top:10px;right:10px;width:200px;border-radius:10px}
+input{
+  flex:1;
+  padding:15px;
+  font-size:16px;
+}
+
+button{
+  padding:15px;
+  font-size:16px;
+}
+
+/* VIDEO */
+video{
+  position:fixed;
+  top:10px;
+  right:10px;
+  width:200px;
+  border-radius:10px;
+}
 
 /* MOBİL */
 @media(max-width:700px){
-  .sidebar{display:none}
-  .inputBox{position:fixed;bottom:0;width:100%}
-  video{width:100% !important;right:0;top:auto;bottom:60px}
+  #topbar{display:flex}
+}
+
+/* SWIPE AREA */
+#swipeZone{
+  position:fixed;
+  left:0;
+  top:0;
+  width:20px;
+  height:100%;
+  z-index:998;
 }
 </style>
 </head>
 
 <body>
 
-<div class="container">
+<div id="swipeZone"></div>
 
-<div class="sidebar">
+<div id="topbar">
+  <button id="menuBtn" onclick="toggleMenu()">☰</button>
+  <span>Chat Pro</span>
+</div>
+
+<div id="mobileMenu">
   <button onclick="createRoom()">+ Oda</button>
-  <button onclick="startScreen()">📺</button>
+  <button onclick="startScreen()">📺 Yayın</button>
 
   <select id="quality">
     <option value="low">Düşük</option>
@@ -53,15 +125,11 @@ video{position:fixed;top:10px;right:10px;width:200px;border-radius:10px}
   <div id="users"></div>
 </div>
 
-<div class="chat">
-  <div class="messages" id="messages"></div>
+<div class="messages" id="messages"></div>
 
-  <div class="inputBox">
-    <input id="msg" placeholder="Mesaj yaz">
-    <button onclick="send()">Gönder</button>
-  </div>
-</div>
-
+<div class="inputBox">
+  <input id="msg" placeholder="Mesaj yaz">
+  <button onclick="send()">Gönder</button>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -75,6 +143,26 @@ socket.emit("setName", username);
 let currentRoom="";
 let localStream;
 
+/* MENU */
+function toggleMenu(){
+  document.getElementById("mobileMenu").classList.toggle("active");
+}
+
+/* SWIPE */
+let startX=0;
+
+document.getElementById("swipeZone").addEventListener("touchstart",e=>{
+  startX = e.touches[0].clientX;
+});
+
+document.addEventListener("touchmove",e=>{
+  let moveX = e.touches[0].clientX;
+
+  if(moveX - startX > 50){
+    document.getElementById("mobileMenu").classList.add("active");
+  }
+});
+
 /* ROOMS */
 socket.emit("getRooms");
 
@@ -85,7 +173,10 @@ socket.on("rooms", list=>{
     const el=document.createElement("div");
     el.className="room";
     el.innerText=`${r.locked?"🔒":"🟢"} ${r.name} (${r.count})`;
-    el.onclick=()=>joinRoom(r.name);
+    el.onclick=()=>{
+      joinRoom(r.name);
+      toggleMenu();
+    };
     div.appendChild(el);
   });
 });
@@ -95,20 +186,17 @@ socket.on("users", list=>{
   document.getElementById("users").innerText="👥 "+list.join(", ");
 });
 
-/* ERROR */
-socket.on("errorMsg", msg=>alert(msg));
-
 /* JOIN */
 function joinRoom(name){
-  const pass = prompt("Şifre");
+  const pass=prompt("Şifre");
   socket.emit("joinRoom",{room:name,username,pass});
   currentRoom=name;
 }
 
 /* CREATE */
 function createRoom(){
-  const name = prompt("Oda adı");
-  const pass = prompt("Şifre");
+  const name=prompt("Oda adı");
+  const pass=prompt("Şifre");
   if(!name) return;
   socket.emit("createRoom",{name,pass});
 }
@@ -135,11 +223,11 @@ document.getElementById("msg").addEventListener("keypress",e=>{
 
 /* KALİTE */
 function getQuality(){
-  const q=document.getElementById("quality").value;
-
   if(/Android|iPhone/i.test(navigator.userAgent)){
     return {width:640,height:360,frameRate:15};
   }
+
+  const q=document.getElementById("quality").value;
 
   if(q==="low") return {width:640,height:360,frameRate:15};
   if(q==="medium") return {width:1280,height:720,frameRate:25};
@@ -178,8 +266,6 @@ function stopScreen(){
     v.remove();
   }
 }
-
-socket.on("screenStarted", ()=>{});
 
 socket.on("screenStopped", ()=>{
   const v=document.getElementById("video");
