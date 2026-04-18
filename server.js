@@ -109,9 +109,14 @@ io.on("connection", socket => {
 
       r.users = r.users.filter(u=>u.id !== socket.id);
 
-      io.to(socket.room).emit("users",
-        r.users.map(u=>u.name)
-      );
+      // 🔥 ODA BOŞSA SİL
+      if(r.users.length === 0){
+        delete rooms[socket.room];
+      }else{
+        io.to(socket.room).emit("users",
+          r.users.map(u=>u.name)
+        );
+      }
 
       if(r.streamer === socket.id){
         r.streamer = null;
