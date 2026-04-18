@@ -9,137 +9,96 @@ let rooms = {};
 
 io.on("connection", socket => {
 
-  /* KULLANICI ADI */
   socket.on("setName", name=>{
     socket.username = name;
   });
 
-  /* ODA OLUŞTUR */
-  socket.on("createRoom", ({name, pass}) => {
-
-    if(!name) return;
-
-    if(rooms[name]){
-      socket.emit("errorMsg","Bu oda zaten var");
-      return;
-    }
+  socket.on("createRoom", ({name, pass})=>{
+    if(rooms[name]) return;
 
     rooms[name] = {
       pass: pass || "",
       users: [],
-      stream:false,
-      streamer:null
+      streamer: null
     };
 
-    /* kuran kişi direkt girsin */
     socket.join(name);
     socket.room = name;
 
-    rooms[name].users.push({
-      id:socket.id,
-      name:socket.username || "Kurucu"
-    });
-
-    io.to(name).emit("users", rooms[name].users.map(u=>u.name));
+    rooms[name].users.push(socket.id);
 
     updateRooms();
   });
 
-  /* ODA LİSTESİ */
-  socket.on("getRooms", ()=>{
-    updateRooms(socket);
-  });
-
-  /* ODAYA GİR */
   socket.on("joinRoom", ({room, username, pass})=>{
-
     const r = rooms[room];
-
     if(r && r.pass === pass){
 
       socket.join(room);
       socket.room = room;
       socket.username = username;
 
-      r.users.push({id:socket.id, name:username});
+      r.users.push(socket.id);
 
-      io.to(room).emit("users", r.users.map(u=>u.name));
-
-      /* aktif yayın varsa bildir */
-      if(r.stream){
-        socket.emit("screenStarted",{id:r.streamer});
+      // 🔥 Eğer yayın varsa yeni gelene söyle
+      if(r.streamer){
+        socket.emit("watchStream", r.streamer);
       }
 
       updateRooms();
-
-    }else{
-      socket.emit("errorMsg","Şifre yanlış");
     }
   });
 
-  /* CHAT */
-  socket.on("chatMessage", msg=>{
+  /* STREAM BAŞLAT */
+  socket.on("startStream", ()=>{
     if(socket.room){
-      io.to(socket.room).emit("message",{
-        text:msg,
-        user:socket.username
-      });
-    }
-  });
-
-  /* EKRAN BAŞLAT */
-  socket.on("startScreen", ()=>{
-    if(socket.room){
-      rooms[socket.room].stream = true;
       rooms[socket.room].streamer = socket.id;
 
-      io.to(socket.room).emit("screenStarted",{id:socket.id});
+      // herkese bildir
+      socket.to(socket.room).emit("newStreamer", socket.id);
     }
   });
 
-  /* EKRAN DURDUR */
-  socket.on("stopScreen", ()=>{
-    if(socket.room){
-      rooms[socket.room].stream = false;
-      rooms[socket.room].streamer = null;
-
-      io.to(socket.room).emit("screenStopped");
-    }
+  /* VIEWER → STREAMER */
+  socket.on("watchStream", (streamerId)=>{
+    io.to(streamerId).emit("viewerJoined", socket.id);
   });
 
-  /* ÇIKIŞ */
+  /* WEBRTC */
+  socket.on("offer", ({to, offer})=>{
+    io.to(to).emit("offer",{from:socket.id, offer});
+  });
+
+  socket.on("answer", ({to, answer})=>{
+    io.to(to).emit("answer",{from:socket.id, answer});
+  });
+
+  socket.on("candidate", ({to, candidate})=>{
+    io.to(to).emit("candidate",{from:socket.id, candidate});
+  });
+
   socket.on("disconnect", ()=>{
     if(socket.room && rooms[socket.room]){
+      const r = rooms[socket.room];
 
-      rooms[socket.room].users =
-        rooms[socket.room].users.filter(u=>u.id!==socket.id);
+      r.users = r.users.filter(id=>id!==socket.id);
 
-      io.to(socket.room).emit("users",
-        rooms[socket.room].users.map(u=>u.name)
-      );
+      if(r.streamer === socket.id){
+        r.streamer = null;
+        io.to(socket.room).emit("streamEnded");
+      }
 
       updateRooms();
     }
   });
 
-  function updateRooms(target){
-    const data = Object.keys(rooms).map(r=>({
+  function updateRooms(){
+    io.emit("rooms", Object.keys(rooms).map(r=>({
       name:r,
-      count:rooms[r].users.length,
-      locked: !!rooms[r].pass
-    }));
-
-    if(target){
-      target.emit("rooms", data);
-    }else{
-      io.emit("rooms", data);
-    }
+      count:rooms[r].users.length
+    })));
   }
 
 });
 
-const PORT = process.env.PORT || 3000;
-
-http.listen(PORT, ()=>{
-  console.log("Server çalışıyor:", PORT);
-});
+http.listen(3000, ()=>console.log("Server çalışıyor"));
