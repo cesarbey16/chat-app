@@ -9,12 +9,13 @@
 body{margin:0;background:#0b0f19;color:#fff;font-family:sans-serif}
 .container{display:flex;height:100vh}
 
+/* SIDEBAR */
 .sidebar{width:250px;background:#111;padding:10px}
 .room{padding:10px;background:#222;margin:5px 0;border-radius:8px;cursor:pointer}
 
+/* CHAT */
 .chat{flex:1;display:flex;flex-direction:column}
 .messages{flex:1;padding:10px;overflow:auto}
-
 .msg{margin:5px;padding:10px;border-radius:10px}
 .me{background:#22c55e;margin-left:auto}
 .other{background:#333}
@@ -23,36 +24,52 @@ body{margin:0;background:#0b0f19;color:#fff;font-family:sans-serif}
 input{flex:1;padding:10px}
 button{padding:10px}
 
-/* VIDEO */
-video{
+/* VIDEO PLAYER */
+#player{
   position:fixed;
+  bottom:10px;
   right:10px;
-  top:10px;
-  width:220px;
+  width:320px;
+  background:#000;
   border-radius:10px;
-  background:black;
+  overflow:hidden;
 }
 
-/* FULLSCREEN */
-video.fullscreen{
-  position:fixed !important;
-  top:0;left:0;
-  width:100vw !important;
-  height:100vh !important;
-  object-fit:contain;
-  z-index:9999;
+#video{
+  width:100%;
 }
 
-/* FULLSCREEN BUTTON */
-#fsBtn{
-  position:fixed;
-  bottom:80px;
-  right:10px;
-  z-index:10000;
-  padding:10px;
+.controls{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px;
+  background:#111;
 }
 
-/* MOBİL */
+.progress{
+  flex:1;
+  height:5px;
+  background:#333;
+  cursor:pointer;
+  position:relative;
+}
+
+.progress div{
+  height:100%;
+  width:0%;
+  background:#22c55e;
+}
+
+button.ctrl{
+  background:none;
+  border:none;
+  color:#fff;
+  font-size:16px;
+  cursor:pointer;
+}
+
+/* MOBILE */
 #topbar{display:none;background:#111;padding:10px;justify-content:space-between}
 #mobileMenu{
   position:fixed;left:-100%;top:0;width:80%;height:100%;
@@ -71,6 +88,13 @@ video.fullscreen{
   .sidebar{display:none}
   #topbar{display:flex}
   .inputBox{position:fixed;bottom:0;width:100%}
+
+  #player{
+    width:100%;
+    right:0;
+    bottom:70px;
+    border-radius:0;
+  }
 }
 </style>
 </head>
@@ -111,7 +135,21 @@ video.fullscreen{
 
 </div>
 
-<button id="fsBtn" onclick="forceFullScreen()">⛶</button>
+<!-- PLAYER -->
+<div id="player" style="display:none;">
+  <video id="video" autoplay playsinline></video>
+
+  <div class="controls">
+    <button class="ctrl" onclick="togglePlay()">▶</button>
+    <button class="ctrl" onclick="toggleMute()">🔊</button>
+
+    <div class="progress" onclick="seek(event)">
+      <div id="progressBar"></div>
+    </div>
+
+    <button class="ctrl" onclick="fullScreen()">⛶</button>
+  </div>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 
@@ -122,6 +160,7 @@ socket.emit("setName", username);
 
 let localStream;
 let peerConnections={};
+let video=document.getElementById("video");
 
 /* MENU */
 function toggleMenu(){
@@ -257,41 +296,38 @@ socket.on("candidate",({from,candidate})=>{
 });
 
 socket.on("streamEnded",()=>{
-  const v=document.getElementById("video");
-  if(v){v.remove();}
+  document.getElementById("player").style.display="none";
 });
 
-/* FULLSCREEN */
-function toggleFullScreen(v){
-  if(!document.fullscreenElement){
-    v.requestFullscreen();
-    v.classList.add("fullscreen");
-  }else{
-    document.exitFullscreen();
-    v.classList.remove("fullscreen");
-  }
-}
-function forceFullScreen(){
-  let v=document.getElementById("video");
-  if(v) toggleFullScreen(v);
+/* PLAYER */
+function showVideo(stream, muted=false){
+  video.srcObject=stream;
+  video.muted=muted;
+  document.getElementById("player").style.display="block";
 }
 
-/* VIDEO */
-function showVideo(stream,muted=false){
-  let v=document.getElementById("video");
-  if(!v){
-    v=document.createElement("video");
-    v.id="video";
-    v.autoplay=true;
-    v.playsInline=true;
+/* PLAYER CONTROLS */
+function togglePlay(){
+  video.paused ? video.play() : video.pause();
+}
 
-    v.onclick=()=>toggleFullScreen(v);
-    v.ondblclick=()=>toggleFullScreen(v);
+function toggleMute(){
+  video.muted=!video.muted;
+}
 
-    document.body.appendChild(v);
-  }
-  v.muted=muted;
-  v.srcObject=stream;
+function fullScreen(){
+  video.requestFullscreen();
+}
+
+video.ontimeupdate=()=>{
+  let p=(video.currentTime/video.duration)*100;
+  document.getElementById("progressBar").style.width=p+"%";
+};
+
+function seek(e){
+  let rect=e.target.getBoundingClientRect();
+  let percent=(e.clientX-rect.left)/rect.width;
+  video.currentTime=video.duration*percent;
 }
 </script>
 
