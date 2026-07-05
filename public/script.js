@@ -51,12 +51,20 @@ loginBtn.addEventListener("click", () => {
     return;
   }
   myUsername = name;
-  myUsernameDisplay.innerText = myUsername;
+  if (myUsernameDisplay) myUsernameDisplay.innerText = myUsername;
   
   socket.emit("setName", myUsername);
   socket.emit("getRooms");
   
+  // Modalı kapat
   loginModal.classList.remove("active");
+  
+  // MOBİL KİLİT ÇÖZÜCÜ: Giriş yapıldığında mobildeki Odalar sekmesini otomatik olarak aktif et
+  if (window.innerWidth <= 768) {
+    const sidebar = document.querySelector(".sidebar");
+    if (sidebar) sidebar.classList.add("tab-active");
+  }
+  
   showToast(`Hoş geldin, ${myUsername}!`, "success");
 });
 
@@ -84,7 +92,7 @@ socket.on("rooms", (roomsList) => {
   roomsCount.innerText = roomsList.length;
 
   if (roomsList.length === 0) {
-    roomsContainer.innerHTML = '<div class="empty-state">Henüz oda yok...</div>';
+    roomsContainer.innerHTML = '<div class="empty-state" style="padding:15px; text-align:center; color:var(--text-muted);">Henüz oda yok...</div>';
     return;
   }
 
@@ -144,6 +152,14 @@ document.getElementById("submitCreateRoomBtn").addEventListener("click", () => {
   closeModal("createRoomModal");
   document.getElementById("roomNameInput").value = "";
   document.getElementById("roomPassInput").value = "";
+
+  // Mobilde oda kurunca direkt chat alanına geçiş yap ki kullanıcı rahat etsin
+  if (window.innerWidth <= 768) {
+    setTimeout(() => {
+      const chatBtn = document.querySelector(".mobile-tab-btn[onclick*='chat']");
+      if (chatBtn) chatBtn.click();
+    }, 100);
+  }
 });
 
 document.getElementById("submitPasswordBtn").addEventListener("click", () => {
@@ -167,6 +183,14 @@ function handleJoinRoom(roomName, pass) {
   leaveRoomBtn.classList.remove("hidden");
 
   socket.emit("joinRoom", { room: roomName, username: myUsername, pass });
+
+  // Mobilde odaya katılınca direkt mesajlar sekmesine aktar
+  if (window.innerWidth <= 768) {
+    setTimeout(() => {
+      const chatBtn = document.querySelector(".mobile-tab-btn[onclick*='chat']");
+      if (chatBtn) chatBtn.click();
+    }, 100);
+  }
 }
 
 leaveRoomBtn.addEventListener("click", () => {
@@ -356,22 +380,17 @@ function attachStreamToPlayer(stream, name, isLocal = false) {
   video.id = "mainLiveVideo";
   video.autoplay = true;
   
-  // MOBİL OYNATMA GÜVENCELERİ (iOS & Android'in videoyu engellemesini önler)
   video.setAttribute("playsinline", "true");
   video.setAttribute("webkit-playsinline", "true");
-  video.muted = isLocal ? true : false; // İzleyiciler için ses açık başlamalı, yayıncı için kapalı
+  video.muted = isLocal ? true : false;
 
   video.srcObject = stream;
-
-  // Çift tıklama tam ekrana geçirsin
   video.ondblclick = () => handleFullscreenToggle();
 
   videoTarget.appendChild(video);
   streamerNameDisplay.innerText = name;
   
-  // Tarayıcı politikaları gereği sesi açık videoyu otomatik başlatmayı garantiye alıyoruz
   video.play().catch(() => {
-    // Eğer tarayıcı engellerse kullanıcıya tıklatarak oynatmak için bir buton/toast veya sessize alıp başlatma koruması
     video.muted = true;
     video.play();
     showToast("Yayın otomatik engellendi, sesi açmak için oynatıcıyı kullanın.", "info");
@@ -389,7 +408,7 @@ function removeVideoPlayer() {
 }
 
 // ============================================================================
-// PLAYER CONTROLS (MOBİL DESTEKLİ TAM EKRAN LOJİĞİ)
+// PLAYER CONTROLS (TAM EKRAN LOJİĞİ)
 // ============================================================================
 
 fullscreenBtn.addEventListener("click", handleFullscreenToggle);
@@ -398,7 +417,6 @@ function handleFullscreenToggle() {
   const v = document.getElementById("mainLiveVideo");
   if (!v) return;
 
-  // MOBİL TAM EKRAN DESTEĞİ (iOS Safari ve Android Chrome yerel oynatıcı tetikleme)
   if (v.webkitEnterFullscreen) {
     v.webkitEnterFullscreen();
     return;
@@ -472,38 +490,13 @@ function escapeHTML(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function launchGame(gameType) {
-  const selector = document.getElementById("gameSelector");
-  const stage = document.getElementById("gameStage");
-  const container = document.getElementById("gameFrameContainer");
-  
-  selector.classList.add("hidden");
-  stage.classList.remove("hidden");
-  container.innerHTML = "";
-
-  const iframe = document.createElement("iframe");
-  iframe.src = `./game/${gameType}.html`;
-  iframe.style.width = "100%";
-  iframe.style.height = "400px";
-  iframe.style.border = "none";
-  iframe.style.borderRadius = "8px";
-  iframe.style.backgroundColor = "#fff";
-
-  container.appendChild(iframe);
-}
-
-function backToGameMenu() {
-  document.getElementById("gameSelector").classList.remove("hidden");
-  document.getElementById("gameStage").classList.add("hidden");
-  document.getElementById("gameFrameContainer").innerHTML = "";
-}
-
-// Mobilde Odalar / Chat / Kullanıcılar arasında geçiş yapmayı sağlayan fonksiyon
 function switchTab(tabName) {
   const sidebar = document.querySelector(".sidebar");
   const chatSection = document.querySelector(".chat-section");
   const usersBar = document.querySelector(".users-bar");
   const tabs = document.querySelectorAll(".mobile-tab-btn");
+
+  if (!sidebar || !chatSection || !usersBar) return;
 
   // Önce her yeri gizle
   sidebar.classList.remove("tab-active");
@@ -517,5 +510,7 @@ function switchTab(tabName) {
   if (tabName === 'users') usersBar.classList.add("tab-active");
 
   // Buton aktifliğini değiştir
-  event.currentTarget.classList.add("active");
+  if (event && event.currentTarget) {
+    event.currentTarget.classList.add("active");
+  }
 }
