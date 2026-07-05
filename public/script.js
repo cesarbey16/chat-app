@@ -53,7 +53,6 @@ loginBtn.addEventListener("click", () => {
   myUsername = name;
   myUsernameDisplay.innerText = myUsername;
   
-  // Sunucuya ismi bildir ve odaları iste
   socket.emit("setName", myUsername);
   socket.emit("getRooms");
   
@@ -65,7 +64,6 @@ usernameInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") loginBtn.click();
 });
 
-// Koyu/Açık Tema Değişimi
 themeToggle.addEventListener("click", () => {
   const currentTheme = document.body.getAttribute("data-theme");
   if (currentTheme === "light") {
@@ -81,7 +79,6 @@ themeToggle.addEventListener("click", () => {
 // ODA YÖNETİMİ (ROOM MANAGEMENT)
 // ============================================================================
 
-// Global oda listesi güncellendiğinde tetiklenir
 socket.on("rooms", (roomsList) => {
   roomsContainer.innerHTML = "";
   roomsCount.innerText = roomsList.length;
@@ -95,7 +92,6 @@ socket.on("rooms", (roomsList) => {
     const item = document.createElement("div");
     item.className = `room-item ${currentRoom === r.name ? 'active' : ''}`;
     
-    // Kilit ve Canlı Yayın İkonları Kontrolü
     const lockIcon = r.locked ? '<i class="fa-solid fa-lock text-muted"></i>' : '';
     const liveBadge = r.hasStream ? '<span class="live-badge-mini">CANLI</span>' : '';
 
@@ -125,7 +121,7 @@ socket.on("rooms", (roomsList) => {
   });
 });
 
-// Oda Kurma Tetikleyicisi
+// Oda Kurma Tetikleyicisi (İlk Kurulumda Mesaj Yazamama Hatası Çözüldü)
 document.getElementById("submitCreateRoomBtn").addEventListener("click", () => {
   const name = document.getElementById("roomNameInput").value.trim();
   const pass = document.getElementById("roomPassInput").value;
@@ -135,13 +131,23 @@ document.getElementById("submitCreateRoomBtn").addEventListener("click", () => {
     return;
   }
   
+  // Arayüzü aktifleştir ve temizle
+  currentRoom = name;
+  messagesContainer.innerHTML = "";
+  currentRoomTitle.innerText = name;
+  
+  chatInput.disabled = false;
+  sendMessageBtn.disabled = false;
+  emojiBtn.disabled = false;
+  startStreamBtn.classList.remove("hidden");
+  leaveRoomBtn.classList.remove("hidden");
+  
   socket.emit("createRoom", { name, pass });
   closeModal("createRoomModal");
   document.getElementById("roomNameInput").value = "";
   document.getElementById("roomPassInput").value = "";
 });
 
-// Şifreli Oda Katılım Tetikleyicisi
 document.getElementById("submitPasswordBtn").addEventListener("click", () => {
   const name = document.getElementById("targetRoomName").value;
   const pass = document.getElementById("joinPassInput").value;
@@ -153,11 +159,9 @@ function handleJoinRoom(roomName, pass) {
   if (currentRoom === roomName) return;
   currentRoom = roomName;
   
-  // Arayüz temizliği ve hazırlığı
   messagesContainer.innerHTML = "";
   currentRoomTitle.innerText = roomName;
   
-  // Chat girişlerini aktif et
   chatInput.disabled = false;
   sendMessageBtn.disabled = false;
   emojiBtn.disabled = false;
@@ -167,9 +171,8 @@ function handleJoinRoom(roomName, pass) {
   socket.emit("joinRoom", { room: roomName, username: myUsername, pass });
 }
 
-// Odadan Çıkış Mantığı
 leaveRoomBtn.addEventListener("click", () => {
-  location.reload(); // En temiz oda sıfırlaması ve WebRTC koparması için sayfayı tazeliyoruz
+  location.reload();
 });
 
 // ============================================================================
@@ -200,7 +203,6 @@ socket.on("users", ({ users, ownerId }) => {
   });
 });
 
-// Mesaj Gönderme
 function sendChatMessage() {
   const text = chatInput.value.trim();
   if (!text) return;
@@ -214,19 +216,16 @@ chatInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendChatMessage();
 });
 
-// MESAJ ALMA LOJİĞİ (SAĞ VE SOL BALON AYRIMI BURADA KESİN ÇÖZÜLDÜ)
 socket.on("message", (msg) => {
-  // Eğer varsayılan hoş geldiniz kutusu duruyorsa onu kaldır
   const welcomeBox = messagesContainer.querySelector(".welcome-box");
   if (welcomeBox) welcomeBox.remove();
 
   const msgRow = document.createElement("div");
   
-  // Paylaştığınız ekran görüntüsündeki çiftleme ve sağ/sol hatası bu koşulla çözüldü
   if (msg.senderId === socket.id) {
-    msgRow.className = "message-row msg-me"; // Benim mesajım sağa yaslanacak
+    msgRow.className = "message-row msg-me";
   } else {
-    msgRow.className = "message-row msg-other"; // Başkalarının mesajı sola yaslanacak
+    msgRow.className = "message-row msg-other";
   }
 
   msgRow.innerHTML = `
@@ -242,13 +241,12 @@ socket.on("message", (msg) => {
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 });
 
-// Hata Bildirimleri Alındığında
 socket.on("errorNotify", (msg) => {
   showToast(msg, "error");
 });
 
 // ============================================================================
-// WEBRTC VE CANLI YAYIN ALTYAPISI (VIDEO STREAMING)
+// WEBRTC VE CANLI YAYIN ALTYAPISI (EKO ÖNLEMELİ)
 // ============================================================================
 
 startStreamBtn.addEventListener("click", async () => {
@@ -262,7 +260,6 @@ startStreamBtn.addEventListener("click", async () => {
     socket.emit("startStream");
     attachStreamToPlayer(localStream, myUsername, true);
 
-    // Yayın durdurulduğunda tetiklenecek native olay bağlayıcı
     localStream.getVideoTracks()[0].onended = () => {
       stopMyStream();
     };
@@ -274,7 +271,6 @@ startStreamBtn.addEventListener("click", async () => {
   }
 });
 
-// İzleyici katıldığında yayıncı tarafında Peer kurulur (P2P Mesh)
 socket.on("viewerJoined", async (viewerId) => {
   if (!localStream) return;
   
@@ -295,13 +291,15 @@ socket.on("viewerJoined", async (viewerId) => {
   socket.emit("offer", { to: viewerId, offer });
 });
 
-// Sunucu sonradan giren kişilere veya odadakilere yayını izle komutu gönderir
+// YAYIN SESİ YANKI/EKO KONTROLÜ BURADA ÇÖZÜLDÜ
 socket.on("watchStream", ({ streamerId, streamerName }) => {
+  if (streamerId === socket.id) return; // Yayıncı kendisiyse izleme kanalını açmaz
   socket.emit("watchStream", streamerId);
   streamerNameDisplay.innerText = streamerName;
 });
 
 socket.on("newStreamer", ({ streamerId, streamerName }) => {
+  if (streamerId === socket.id) return; // Yayıncı kendisiyse izleme kanalını açmaz
   socket.emit("watchStream", streamerId);
   streamerNameDisplay.innerText = streamerName;
 });
@@ -339,7 +337,6 @@ socket.on("candidate", ({ from, candidate }) => {
   }
 });
 
-// Yayın Kapanınca Siyah Ekran Kalmasını Çözen Fonksiyon
 socket.on("streamEnded", () => {
   removeVideoPlayer();
   showToast("Canlı yayın sona erdi.", "info");
@@ -350,34 +347,29 @@ function stopMyStream() {
     localStream.getTracks().forEach(track => track.stop());
     localStream = null;
   }
-  socket.emit("disconnect"); // Sunucuda temizlik yapılması için tetikle
+  socket.emit("disconnect");
   location.reload();
 }
 
-// Oynatıcı Alanına Videoyu Enjekte Eden Fonksiyon
 function attachStreamToPlayer(stream, name, isLocal = false) {
   videoPlayerContainer.classList.remove("hidden");
-  videoTarget.innerHTML = ""; // Varsa eski kalıntıları temizle
+  videoTarget.innerHTML = "";
 
   const video = document.createElement("video");
   video.id = "mainLiveVideo";
   video.autoplay = true;
   video.playsInline = true;
   video.srcObject = stream;
-  video.muted = isLocal; // Kendimize kendi sesimizin yankı yapmasını önlüyoruz
+  video.muted = isLocal; // Kendimize sesimizin yansımasını engeller
 
-  // Tam ekran çift tıklama kontrolü
   video.ondblclick = () => handleFullscreenToggle();
-  // Mobil tek dokunuş kontrolü
   video.onclick = () => handleFullscreenToggle();
 
   videoTarget.appendChild(video);
   streamerNameDisplay.innerText = name;
   
-  // Gecikme Göstergesini Simüle Etme (WebRTC için optimize)
-  const start = Date.now();
   setTimeout(() => {
-    latencyValue.innerText = Math.floor(Math.random() * 15 + 5); // 5-20ms arası gerçekçi gecikme
+    latencyValue.innerText = Math.floor(Math.random() * 15 + 5);
   }, 1000);
 }
 
@@ -388,7 +380,7 @@ function removeVideoPlayer() {
 }
 
 // ============================================================================
-// PLAYER CONTROLS (YOUTUBE TARZI YÖNETİM)
+// PLAYER CONTROLS
 // ============================================================================
 
 fullscreenBtn.addEventListener("click", handleFullscreenToggle);
@@ -407,7 +399,6 @@ function handleFullscreenToggle() {
   }
 }
 
-// Fullscreen escape izleyicisi
 document.addEventListener("fullscreenchange", () => {
   if (!document.fullscreenElement) {
     videoPlayerContainer.classList.remove("fullscreen-mode");
@@ -437,7 +428,7 @@ playPauseBtn.addEventListener("click", () => {
 });
 
 // ============================================================================
-// MODALLAR VE YARDIMCI ARAÇLAR (HELPERS)
+// HELPERS & GAMES
 // ============================================================================
 
 function openModal(id) {
@@ -465,10 +456,6 @@ function showToast(message, type = "info") {
 function escapeHTML(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-
-// ============================================================================
-// OYUN MERKEZİ ENJEKTÖRÜ (GAME CENTER)
-// ============================================================================
 
 function launchGame(gameType) {
   const selector = document.getElementById("gameSelector");
