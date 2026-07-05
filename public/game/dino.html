@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatPro - Dino Game</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background: #111;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    #gameContainer {
+      position: relative;
+      width: 600px;
+      height: 200px;
+      background: #222;
+      border: 2px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #dino {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: #00e676; /* ChatPro Yeşili */
+      bottom: 0;
+      left: 50px;
+      border-radius: 4px;
+    }
+    .cactus {
+      position: absolute;
+      width: 20px;
+      height: 40px;
+      background: #ff5252; /* Kırmızı Engel */
+      bottom: 0;
+      left: 600px;
+      border-radius: 2px;
+    }
+    #scoreBoard {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #aaa;
+      font-family: monospace;
+    }
+    #gameOverScreen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    #gameOverScreen.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #gameOverScreen h2 {
+      color: #ff5252;
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+    #gameOverScreen p {
+      color: #fff;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+    #restartBtn {
+      background: #00e676;
+      color: #111;
+      border: none;
+      padding: 8px 18px;
+      font-weight: bold;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    #restartBtn:hover {
+      transform: scale(1.05);
+    }
+    .info-bar {
+      position: absolute;
+      bottom: 10px;
+      left: 15px;
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="gameContainer">
+    <div id="scoreBoard">SCORE: 00000</div>
+    <div id="dino"></div>
+    <div class="info-bar">Zıplamak için Boşluk (Space) veya Ekrana Dokun</div>
+
+    <!-- OYUN BİTTİ EKRANI -->
+    <div id="gameOverScreen">
+      <h2>OYUN BİTTİ</h2>
+      <p id="finalScoreText">Skorun: 0</p>
+      <button id="restartBtn">Tekrar Dene</button>
+    </div>
+  </div>
+
+  <script>
+    const dino = document.getElementById("dino");
+    const gameContainer = document.getElementById("gameContainer");
+    const scoreBoard = document.getElementById("scoreBoard");
+    const gameOverScreen = document.getElementById("gameOverScreen");
+    const finalScoreText = document.getElementById("finalScoreText");
+    const restartBtn = document.getElementById("restartBtn");
+
+    let isJumping = false;
+    let gravity = 0.6;
+    let isGameOver = false;
+    let score = 0;
+    let obstacleTimeout;
+    let gameLoopInterval;
+    let activeObstacles = [];
+
+    // Zıplama Kontrolü (Klavye + Dokunmatik)
+    document.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        jump();
+      }
+    });
+
+    gameContainer.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      jump();
+    });
+
+    function jump() {
+      if (isJumping || isGameOver) return;
+      isJumping = true;
+      let position = 0;
+      
+      // Zıplama Yukarı Çıkış ve İniş Hareketi (Animasyon Döngüsü)
+      let upInterval = setInterval(() => {
+        if (position >= 130) {
+          clearInterval(upInterval);
+          // Aşağı İniş
+          let downInterval = setInterval(() => {
+            if (position <= 0) {
+              clearInterval(downInterval);
+              isJumping = false;
+              position = 0;
+              dino.style.bottom = position + "px";
+            } else {
+              position -= 5;
+              dino.style.bottom = position + "px";
+            }
+          }, 12);
+        } else {
+          position += 6;
+          dino.style.bottom = position + "px";
+        }
+      }, 12);
+    }
+
+    // Engel Oluşturucu (Rastgele Sürelerle Gelir)
+    function generateObstacles() {
+      if (isGameOver) return;
+
+      const cactus = document.createElement("div");
+      cactus.classList.add("cactus");
+      gameContainer.appendChild(cactus);
+      activeObstacles.push(cactus);
+
+      let obstaclePosition = 600;
+
+      let moveInterval = setInterval(() => {
+        if (isGameOver) {
+          clearInterval(moveInterval);
+          return;
+        }
+
+        obstaclePosition -= 6;
+        cactus.style.left = obstaclePosition + "px";
+
+        // Ekrandan Çıkan Engelleri Temizle ve Skoru Artır
+        if (obstaclePosition < -20) {
+          clearInterval(moveInterval);
+          cactus.remove();
+          activeObstacles = activeObstacles.filter(obs => obs !== cactus);
+          score += 10;
+          scoreBoard.innerText = "SCORE: " + String(score).padStart(5, '0');
+        }
+
+        // Çarpışma Algoritması (Hitbox Hesaplama)
+        let dinoBottom = parseInt(window.getComputedStyle(dino).getPropertyValue("bottom"));
+        
+        if (obstaclePosition > 50 && obstaclePosition < 90 && dinoBottom <= 40) {
+          clearInterval(moveInterval);
+          endGame();
+        }
+      }, 15);
+
+      // Sonraki engeli rastgele bir süre sonra fırlat (1sn - 2.5sn arası)
+      let randomTime = Math.random() * 1500 + 1000;
+      obstacleTimeout = setTimeout(generateObstacles, randomTime);
+    }
+
+    function endGame() {
+      isGameOver = true;
+      clearTimeout(obstacleTimeout);
+      finalScoreText.innerText = "Skorun: " + score;
+      gameOverScreen.classList.add("active");
+    }
+
+    function resetGame() {
+      // Eski engelleri temizle
+      activeObstacles.forEach(obs => obs.remove());
+      activeObstacles = [];
+      
+      isGameOver = false;
+      score = 0;
+      scoreBoard.innerText = "SCORE: 00000";
+      dino.style.bottom = "0px";
+      isJumping = false;
+      
+      gameOverScreen.classList.remove("active");
+      clearTimeout(obstacleTimeout);
+      
+      // Oyunu yeniden başlat
+      generateObstacles();
+    }
+
+    restartBtn.addEventListener("click", resetGame);
+
+    // İlk Açılışta Oyunu Başlat
+    generateObstacles();
+  </script>
+</body>
+</html>
