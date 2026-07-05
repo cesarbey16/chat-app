@@ -1,346 +1,247 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chat Pro</title>
-
-<style>
-body{margin:0;background:#0b0f19;color:#fff;font-family:sans-serif}
-.container{display:flex;height:100vh}
-
-.sidebar{width:250px;background:#111;padding:10px}
-.room{padding:10px;background:#222;margin:5px 0;border-radius:8px;cursor:pointer}
-
-.chat{flex:1;display:flex;flex-direction:column}
-.messages{flex:1;padding:10px;overflow:auto}
-.msg{margin:5px;padding:10px;border-radius:10px}
-.me{background:#22c55e;margin-left:auto}
-.other{background:#333}
-
-.inputBox{display:flex}
-input{flex:1;padding:10px}
-button{padding:10px}
-
-/* PLAYER */
-#player{
-  position:fixed;
-  bottom:10px;
-  right:10px;
-  width:320px;
-  background:#000;
-  border-radius:10px;
-  overflow:hidden;
-}
-#video{width:100%}
-
-/* FAKE FULLSCREEN */
-video.fakeFull{
-  position:fixed!important;
-  top:0;left:0;
-  width:100vw!important;
-  height:100vh!important;
-  background:black;
-  z-index:9999;
-  object-fit:contain;
-}
-
-.controls{
-  display:flex;
-  gap:8px;
-  padding:6px;
-  background:#111;
-}
-
-.progress{
-  flex:1;
-  height:5px;
-  background:#333;
-  cursor:pointer;
-}
-.progress div{
-  height:100%;
-  width:0%;
-  background:#22c55e;
-}
-
-.ctrl{
-  background:none;
-  border:none;
-  color:#fff;
-}
-
-/* MOBILE */
-#topbar{display:none;background:#111;padding:10px;justify-content:space-between}
-#mobileMenu{
-  position:fixed;left:-100%;top:0;width:80%;height:100%;
-  background:#111;transition:0.3s;z-index:999;
-}
-#mobileMenu.active{left:0}
-
-#overlay{
-  position:fixed;width:100%;height:100%;
-  background:rgba(0,0,0,0.5);
-  display:none;
-}
-#overlay.active{display:block}
-
-@media(max-width:700px){
-  .sidebar{display:none}
-  #topbar{display:flex}
-  .inputBox{position:fixed;bottom:0;width:100%}
-
-  #player{
-    width:100%;
-    right:0;
-    bottom:70px;
-    border-radius:0;
-  }
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatPro - Premium Dashboard</title>
+  <!-- Google Fonts & FontAwesome (İkonlar İçin) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<div id="topbar">
-  <button onclick="toggleMenu()">☰</button>
-  <span>Chat</span>
-  <button onclick="startScreen()">📺</button>
-</div>
-
-<div id="mobileMenu">
-  <button onclick="createRoom()">+ Oda</button>
-  <div id="roomsMobile"></div>
-  <div id="usersMobile"></div>
-</div>
-
-<div id="overlay" onclick="closeMenu()"></div>
-
-<div class="container">
-
-<div class="sidebar">
-  <button onclick="createRoom()">+ Oda</button>
-  <button onclick="startScreen()">📺</button>
-  <div id="rooms"></div>
-  <div id="users"></div>
-</div>
-
-<div class="chat">
-  <div class="messages" id="messages"></div>
-
-  <div class="inputBox">
-    <input id="msg">
-    <button onclick="send()">Gönder</button>
-  </div>
-</div>
-
-</div>
-
-<!-- PLAYER -->
-<div id="player" style="display:none;">
-  <video id="video" autoplay playsinline></video>
-
-  <div class="controls">
-    <button class="ctrl" onclick="togglePlay()">▶</button>
-    <button class="ctrl" onclick="toggleMute()">🔊</button>
-
-    <div class="progress" onclick="seek(event)">
-      <div id="progressBar"></div>
+  <!-- GİRİŞ EKRANI / USERNAME MODAL -->
+  <div id="loginModal" class="modal-overlay active">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-rocket animate-pulse"></i> ChatPro'ya Hoş Geldiniz</h2>
+        <p>Devam etmek için kendinize havalı bir takma ad seçin.</p>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="usernameInput">Kullanıcı Adınız</label>
+          <input type="text" id="usernameInput" placeholder="Örn: Muhommet" autocomplete="off">
+        </div>
+        <button id="loginBtn" class="btn btn-primary btn-block">Sisteme Giriş Yap</button>
+      </div>
     </div>
-
-    <button class="ctrl" onclick="fullScreen()">⛶</button>
   </div>
-</div>
 
-<script src="/socket.io/socket.io.js"></script>
+  <!-- ODA OLUŞTURMA MODAL -->
+  <div id="createRoomModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-plus-circle"></i> Yeni Oda Oluştur</h2>
+        <p>Arkadaşlarınızla toplanamayacağınız gizli bir alan tasarlayın.</p>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="roomNameInput">Oda Adı</label>
+          <input type="text" id="roomNameInput" placeholder="Örn: Güneyliler" autocomplete="off">
+        </div>
+        <div class="input-group">
+          <label for="roomPassInput">Oda Şifresi (İsteğe Bağlı)</label>
+          <input type="password" id="roomPassInput" placeholder="Boş bırakırsanız şifresiz olur">
+        </div>
+        <div class="modal-actions">
+          <button onclick="closeModal('createRoomModal')" class="btn btn-secondary">İptal</button>
+          <button id="submitCreateRoomBtn" class="btn btn-primary">Odayı Aç</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-<script>
-const socket = io();
-let username = prompt("İsmin");
-socket.emit("setName", username);
+  <!-- ŞİFRE GİRİŞ MODAL -->
+  <div id="passwordModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-lock text-warning"></i> Kilitli Oda</h2>
+        <p>Bu odaya girmek için belirlenen şifreyi yazmalısınız.</p>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="targetRoomName">
+        <div class="input-group">
+          <label for="joinPassInput">Şifre</label>
+          <input type="password" id="joinPassInput" placeholder="••••••••">
+        </div>
+        <div class="modal-actions">
+          <button onclick="closeModal('passwordModal')" class="btn btn-secondary">Vazgeç</button>
+          <button id="submitPasswordBtn" class="btn btn-success">Odaya Katıl</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-let localStream;
-let peerConnections={};
-let video=document.getElementById("video");
+  <!-- MINI OYUN MERKEZİ (MODAL) -->
+  <div id="gameCenterModal" class="modal-overlay">
+    <div class="modal-card modal-large">
+      <div class="modal-header header-inline">
+        <h2><i class="fa-solid fa-gamepad text-primary"></i> ChatPro Oyun Merkezi</h2>
+        <button onclick="closeModal('gameCenterModal')" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <!-- Oyun Seçim Menüsü -->
+        <div id="gameSelector" class="game-grid">
+          <div class="game-card" onclick="launchGame('dino')">
+            <i class="fa-solid fa-dragon game-icon"></i>
+            <h3>Chrome Dino</h3>
+            <p>Engellerden zıplayarak en yüksek skora ulaşın.</p>
+          </div>
+          <div class="game-card" onclick="launchGame('snake')">
+            <i class="fa-solid fa-worm game-icon"></i>
+            <h3>Yılan Oyunu</h3>
+            <p>Yemleri toplayın, kendi kuyruğunuzu ısırmayın!</p>
+          </div>
+        </div>
+        <!-- Oyun Alanı / Iframe Tipi Yükleme Bölgesi -->
+        <div id="gameStage" class="game-stage hidden">
+          <button onclick="backToGameMenu()" class="btn btn-secondary btn-sm mb-3"><i class="fa-solid fa-arrow-left"></i> Menüye Dön</button>
+          <div id="gameFrameContainer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-/* MENU */
-function toggleMenu(){
-  mobileMenu.classList.toggle("active");
-  overlay.classList.toggle("active");
-}
-function closeMenu(){
-  mobileMenu.classList.remove("active");
-  overlay.classList.remove("active");
-}
+  <!-- ANA UYGULAMA ALANI (DISCORD STYLE) -->
+  <div class="app-layout">
+    
+    <!-- SOL SIDEBAR: ODALAR VE SEÇENEKLER -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <span class="logo-dot"></span>
+          <h1>ChatPro</h1>
+        </div>
+        <span class="status-badge">ONLINE</span>
+      </div>
 
-/* ROOMS */
-socket.emit("getRooms");
+      <div class="sidebar-actions">
+        <button onclick="openModal('createRoomModal')" class="btn btn-primary btn-sm btn-block">
+          <i class="fa-solid fa-plus"></i> Oda Oluştur
+        </button>
+      </div>
 
-socket.on("rooms", list=>{
-  rooms.innerHTML="";
-  roomsMobile.innerHTML="";
+      <!-- ODALAR LİSTESİ -->
+      <div class="sidebar-section">
+        <h3 class="section-title">AKTİF ODALAR (<span id="roomsCount">0</span>)</h3>
+        <div id="roomsContainer" class="rooms-list">
+          <!-- Odalar dinamik olarak buraya gelecek -->
+          <div class="empty-state">Henüz oda yok...</div>
+        </div>
+      </div>
 
-  list.forEach(r=>{
-    let el=document.createElement("div");
-    el.className="room";
-    el.innerText=r.name+" ("+r.count+")";
-    el.onclick=()=>joinRoom(r.name);
+      <!-- KULLANICI PROFİL PANELİ (SIDEBAR EN ALTI) -->
+      <div class="user-profile-panel">
+        <div class="user-info">
+          <div class="avatar">
+            <i class="fa-solid fa-user-ninja"></i>
+            <span class="avatar-status status-online"></span>
+          </div>
+          <div class="user-meta">
+            <span id="myUsernameDisplay" class="username">Misafir</span>
+            <span class="user-tag">#0001</span>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button onclick="openModal('gameCenterModal')" title="Oyun Merkezi"><i class="fa-solid fa-gamepad"></i></button>
+          <button id="themeToggle" title="Tema Değiştir"><i class="fa-solid fa-moon"></i></button>
+        </div>
+      </div>
+    </aside>
 
-    rooms.appendChild(el.cloneNode(true));
-    roomsMobile.appendChild(el);
-  });
-});
+    <!-- SAĞ TARAF: VİDEO VE CHAT EKRANI -->
+    <main class="main-content">
+      
+      <!-- ODA ÜST BARI -->
+      <header class="room-header">
+        <div class="room-title-area">
+          <i class="fa-solid fa-hashtag room-icon"></i>
+          <h2 id="currentRoomTitle">Lütfen bir odaya katılın</h2>
+        </div>
+        <div class="room-controls">
+          <button id="startStreamBtn" class="btn btn-success btn-sm hidden">
+            <i class="fa-solid fa-desktop"></i> Ekran Paylaşımı Başlat
+          </button>
+          <button id="leaveRoomBtn" class="btn btn-danger btn-sm hidden">
+            <i class="fa-solid fa-door-open"></i> Odadan Çık
+          </button>
+        </div>
+      </header>
 
-/* USERS */
-socket.on("users", list=>{
-  users.innerText=list.join(", ");
-  usersMobile.innerText=list.join(", ");
-});
+      <!-- İÇERİK BÖLGESİ (VİDEO + CHAT + KULLANICILAR YAPISI) -->
+      <div class="workspace">
+        
+        <!-- MERKEZİ ALAN: YAYIN VE CHAT -->
+        <div class="center-stage">
+          
+          <!-- VİDEO OYNATICI (YOUTUBE TARZI PREMIUM PLAYER) -->
+          <div id="videoPlayerContainer" class="video-player hidden">
+            <div class="live-indicator"><span class="pulse-dot"></span> CANLI</div>
+            <div class="streamer-tag"><i class="fa-solid fa-tv"></i> Yayıncı: <span id="streamerNameDisplay">-</span></div>
+            
+            <!-- Gerçek Video Elementleri Buraya Enjekte Edilecek -->
+            <div id="videoTarget"></div>
 
-/* JOIN */
-function joinRoom(name){
-  const pass=prompt("Şifre");
-  socket.emit("joinRoom",{room:name,username,pass});
-  closeMenu();
-}
+            <!-- Özel Kontrol Paneli -->
+            <div class="player-controls">
+              <div class="controls-left">
+                <button id="playPauseBtn"><i class="fa-solid fa-pause"></i></button>
+                <div class="volume-control">
+                  <button id="muteBtn"><i class="fa-solid fa-volume-high"></i></button>
+                </div>
+              </div>
+              <div class="controls-right">
+                <span class="latency-indicator"><i class="fa-solid fa-gauge-high"></i> <span id="latencyValue">0</span>ms</span>
+                <button id="fullscreenBtn" title="Tam Ekran"><i class="fa-solid fa-expand"></i></button>
+              </div>
+            </div>
+          </div>
 
-/* CREATE */
-function createRoom(){
-  const name=prompt("Oda adı");
-  const pass=prompt("Şifre");
-  socket.emit("createRoom",{name,pass});
-}
+          <!-- SOHBET ALANI -->
+          <div class="chat-area">
+            <!-- Mesajların akacağı container -->
+            <div id="messagesContainer" class="messages-container">
+              <div class="welcome-box">
+                <i class="fa-solid fa-comments welcome-icon"></i>
+                <h3>ChatPro Sohbet Odasına Hoş Geldiniz!</h3>
+                <p>Bir odaya katılarak anlık mesajlaşmaya ve yayınları izlemeye başlayabilirsiniz.</p>
+              </div>
+            </div>
 
-/* CHAT */
-function send(){
-  let m=msg.value;
-  if(!m) return;
-  socket.emit("chatMessage",m);
-  msg.value="";
-}
+            <!-- INPUT KUTUSU -->
+            <div class="chat-input-wrapper">
+              <div class="input-box">
+                <input type="text" id="chatInput" placeholder="Mesajınızı buraya yazın..." disabled autocomplete="off">
+                <div class="input-actions">
+                  <button id="emojiBtn" title="Emoji Ekle" disabled><i class="fa-regular fa-face-smile"></i></button>
+                  <button id="sendMessageBtn" title="Gönder" disabled><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
 
-socket.on("message",m=>{
-  let d=document.createElement("div");
-  d.className="msg "+(m.user===username?"me":"other");
-  d.innerText=m.user+": "+m.text;
-  messages.appendChild(d);
-});
+        </div>
 
-msg.addEventListener("keypress",e=>{
-  if(e.key==="Enter") send();
-});
+        <!-- SAĞ SIDEBAR: ODADAKİ KULLANICILAR LİSTESİ -->
+        <aside class="users-sidebar">
+          <h3 class="users-title">ODADAKİLER — <span id="usersCount">0</span></h3>
+          <div id="usersContainer" class="users-list">
+            <!-- Kullanıcılar ve rolleri dinamik yüklenecek -->
+            <div class="empty-state-mini">Oda seçilmedi</div>
+          </div>
+        </aside>
 
-/* WEBRTC */
-const config={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};
+      </div>
+    </main>
+  </div>
 
-async function startScreen(){
-  localStream = await navigator.mediaDevices.getDisplayMedia({
-    video:true,audio:true
-  });
+  <!-- GLOBAL BİLDİRİM / TOAST SİSTEMİ -->
+  <div id="toastContainer" class="toast-container"></div>
 
-  socket.emit("startStream");
-  showVideo(localStream,true);
-}
-
-socket.on("viewerJoined", async id=>{
-  const pc=new RTCPeerConnection(config);
-  peerConnections[id]=pc;
-
-  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-
-  pc.onicecandidate=e=>{
-    if(e.candidate){
-      socket.emit("candidate",{to:id,candidate:e.candidate});
-    }
-  };
-
-  const offer=await pc.createOffer();
-  await pc.setLocalDescription(offer);
-
-  socket.emit("offer",{to:id,offer});
-});
-
-socket.on("watchStream", id=>{
-  socket.emit("watchStream",id);
-});
-
-socket.on("newStreamer", id=>{
-  socket.emit("watchStream",id);
-});
-
-socket.on("offer", async ({from,offer})=>{
-  const pc=new RTCPeerConnection(config);
-  peerConnections[from]=pc;
-
-  pc.ontrack=e=>showVideo(e.streams[0]);
-
-  pc.onicecandidate=e=>{
-    if(e.candidate){
-      socket.emit("candidate",{to:from,candidate:e.candidate});
-    }
-  };
-
-  await pc.setRemoteDescription(offer);
-
-  const answer=await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-
-  socket.emit("answer",{to:from,answer});
-});
-
-socket.on("answer",({from,answer})=>{
-  peerConnections[from].setRemoteDescription(answer);
-});
-
-socket.on("candidate",({from,candidate})=>{
-  peerConnections[from].addIceCandidate(candidate);
-});
-
-socket.on("streamEnded",()=>{
-  document.getElementById("player").style.display="none";
-});
-
-/* PLAYER */
-function showVideo(stream, muted=false){
-  video.srcObject=stream;
-  video.muted=muted;
-  player.style.display="block";
-}
-
-/* CONTROLS */
-function togglePlay(){
-  video.paused ? video.play() : video.pause();
-}
-
-function toggleMute(){
-  video.muted=!video.muted;
-}
-
-/* FULLSCREEN FIX */
-function fullScreen(){
-  if(video.webkitEnterFullscreen){
-    video.webkitEnterFullscreen();
-  }else if(video.requestFullscreen){
-    video.requestFullscreen();
-  }else{
-    video.classList.toggle("fakeFull");
-  }
-}
-
-/* PROGRESS */
-video.ontimeupdate=()=>{
-  if(video.duration){
-    let p=(video.currentTime/video.duration)*100;
-    progressBar.style.width=p+"%";
-  }
-};
-
-function seek(e){
-  let rect=e.target.getBoundingClientRect();
-  let percent=(e.clientX-rect.left)/rect.width;
-  video.currentTime=video.duration*percent;
-}
-</script>
-
+  <!-- SCRIPT BAĞLANTILARI -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- Tüm lojikleri tek parça veya modüler birleştiren script dosyamız -->
+  <script src="script.js"></script>
 </body>
 </html>
