@@ -845,3 +845,117 @@ body {
   .users-sidebar { display: none; }
   .message-bubble { max-width: 85%; }
 }
+/* ... (Mevcut CSS Kodlarının Devamı) ... */
+
+/* ============================================================================
+   MOBILE & RESPONSIVE OPTIMIZATIONS (CSS PREMIUM)
+   ============================================================================ */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+    height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-height: 220px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .rooms-list {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px;
+    white-space: nowrap;
+  }
+
+  .room-item {
+    min-width: 160px;
+    margin-bottom: 0 !important;
+    flex-shrink: 0;
+  }
+
+  .main-content {
+    flex: 1;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .video-section {
+    padding: 10px;
+  }
+
+  .video-player-container {
+    height: 220px;
+  }
+
+  .chat-section {
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .messages-container {
+    flex: 1;
+    max-height: 320px;
+  }
+
+  .chat-input-area {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .chat-input-area input {
+    padding: 12px;
+    font-size: 15px;
+  }
+
+  .btn-send {
+    padding: 0 16px;
+  }
+
+  .users-bar {
+    width: 100% !important;
+    min-width: 100% !important;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    max-height: 150px;
+    overflow-y: auto;
+  }
+
+  .users-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .user-card {
+    margin-bottom: 0 !important;
+  }
+
+  .modal-content {
+    width: 92% !important;
+    padding: 20px;
+  }
+  
+  .chat-header {
+    padding: 12px 15px;
+  }
+  
+  .room-actions {
+    gap: 6px;
+  }
+  
+  .btn-stream, .btn-leave {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
