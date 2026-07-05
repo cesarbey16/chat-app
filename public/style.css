@@ -44,7 +44,6 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
-/* App Container Layout */
 .app-container {
   display: flex;
   width: 100%;
@@ -53,7 +52,7 @@ body {
 }
 
 /* ============================================================================
-   SIDEBAR (ROOMS SECTION)
+   SIDEBAR (ROOMS & GAMES SECTION)
    ============================================================================ */
 .sidebar {
   width: 280px;
@@ -124,6 +123,13 @@ body {
   letter-spacing: 1px;
 }
 
+.section-divider {
+  border: 0;
+  height: 1px;
+  background: var(--border-color);
+  margin: 20px 0;
+}
+
 .rooms-list {
   display: flex;
   flex-direction: column;
@@ -179,8 +185,52 @@ body {
   animation: pulse 1.5s infinite;
 }
 
+/* Oyun Seçim Tasarımları */
+.game-selector-box {
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.game-info-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  line-height: 1.3;
+}
+
+.game-buttons-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-game {
+  width: 100%;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-game:hover {
+  background: var(--primary-color);
+  color: #fff;
+  border-color: var(--primary-color);
+}
+
 /* ============================================================================
-   MAIN CONTENT AREA (VIDEO PLAYER & STREAM)
+   MAIN CONTENT AREA (VIDEO PLAYER & GAME STAGE)
    ============================================================================ */
 .main-content {
   flex: 1;
@@ -271,7 +321,41 @@ body {
   object-fit: contain;
 }
 
-/* Custom Video Controls overlay */
+/* Oyun Oynama Ekranı Tasarımı */
+.game-stage-container {
+  padding: 15px;
+  background-color: var(--surface-color);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.game-stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.btn-close-game {
+  background: var(--error-color);
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.game-frame-wrapper {
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Custom Video Controls */
 .player-controls-overlay {
   position: absolute;
   bottom: 0;
@@ -451,7 +535,6 @@ body {
   background-color: var(--primary-hover);
 }
 
-/* Empty/Welcome state inside chat */
 .welcome-box {
   display: flex;
   flex-direction: column;
@@ -674,11 +757,15 @@ body {
     height: 190px;
     border-radius: 0;
   }
-  
-  /* Tam Ekran Modu aktifken video boyutu */
+
   .video-player-container.fullscreen-mode {
     height: 100% !important;
     max-width: 100% !important;
+  }
+
+  /* Oyun Alanı Mobilde Küçük Ekranlara Sığsın */
+  .game-stage-container {
+    padding: 8px;
   }
 
   .sidebar, .chat-section, .users-bar {
