@@ -382,7 +382,19 @@ function attachStreamToPlayer(stream, name, isLocal = false) {
   
   video.setAttribute("playsinline", "true");
   video.setAttribute("webkit-playsinline", "true");
-  video.muted = isLocal ? true : false;
+
+  // ==========================================
+  // YANKI ENGELLEME KİLİDİ (MUTED CONTROL)
+  // ==========================================
+  // Eğer yayını açan bendeysem (isLocal === true), kendi sesimi duymamalıyım.
+  // Eğer isLocal true olmasına rağmen ses açık kalırsa mikrofon hoparlörden çıkan sesi tekrar yakalar ve yankı yapar.
+  if (isLocal || name === myUsername) {
+    video.muted = true; 
+    video.volume = 0;
+  } else {
+    video.muted = false;
+    video.volume = 1.0;
+  }
 
   video.srcObject = stream;
   video.ondblclick = () => handleFullscreenToggle();
@@ -391,9 +403,12 @@ function attachStreamToPlayer(stream, name, isLocal = false) {
   streamerNameDisplay.innerText = name;
   
   video.play().catch(() => {
-    video.muted = true;
-    video.play();
-    showToast("Yayın otomatik engellendi, sesi açmak için oynatıcıyı kullanın.", "info");
+    // Tarayıcı politikası gereği otomatik oynama engellenirse izleyiciler için sessiz başlatıp uyarı veriyoruz
+    if (!isLocal && name !== myUsername) {
+      video.muted = true;
+      video.play();
+      showToast("Yayın otomatik engellendi, sesi açmak için oynatıcıyı kullanın.", "info");
+    }
   });
 
   setTimeout(() => {
