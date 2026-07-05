@@ -16,7 +16,7 @@
   <!-- UYGULAMA ANA KAPSAYICI -->
   <div class="app-container">
     
-    <!-- ODALAR LİSTESİ (SOL BAR) - Mobilde varsayılan aktif sekme -->
+    <!-- ODALAR VE OYUNLAR LİSTESİ (SOL BAR) -->
     <div class="sidebar tab-active">
       <div class="sidebar-header">
         <div class="logo-area">
@@ -39,10 +39,23 @@
         <div id="roomsContainer" class="rooms-list">
           <!-- Odalar JavaScript tarafından dinamik enjekte edilir -->
         </div>
+
+        <hr class="section-divider">
+
+        <!-- GERİ GETİRİLEN OYUN SEÇİM ALANI -->
+        <div class="section-title">Eğlence Paneli</div>
+        <div id="gameSelector" class="game-selector-box">
+          <p class="game-info-text">Yayın izlerken veya beklerken oynayabileceğiniz oyunlar:</p>
+          <div class="game-buttons-grid">
+            <button class="btn-game" onclick="launchGame('dino')">
+              <i class="fa-solid fa-chrome"></i> Dino Oyunu
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- MERKEZİ İÇERİK ALANI (VİDEO VE SOHBET) -->
+    <!-- MERKEZİ İÇERİK ALANI (VİDEO, OYUN SAHNESİ VE SOHBET) -->
     <div class="main-content">
       
       <!-- ÜST GEZİNTİ VE ODA ADI BARINDIRICI -->
@@ -62,7 +75,6 @@
           <div id="videoTarget" class="video-target">
             <!-- Canlı video elementi buraya enjekte edilir -->
           </div>
-          <!-- Oynatıcı Kontrol Paneli -->
           <div class="player-controls-overlay">
             <div class="controls-left">
               <button id="playPauseBtn" class="control-btn"><i class="fa-solid fa-pause"></i></button>
@@ -77,6 +89,15 @@
         </div>
       </div>
 
+      <!-- AKTİF OYUN SAHNESİ (IFRAME BURAYA GELECEK) -->
+      <div id="gameStage" class="game-stage-container hidden">
+        <div class="game-stage-header">
+          <span><i class="fa-solid fa-gamepad"></i> Aktif Oyun Modu</span>
+          <button class="btn-close-game" onclick="backToGameMenu()"><i class="fa-solid fa-xmark"></i> Oyunu Kapat</button>
+        </div>
+        <div id="gameFrameContainer" class="game-frame-wrapper"></div>
+      </div>
+
       <!-- SOHBET ALANI -->
       <div class="chat-section">
         <div id="messagesContainer" class="messages-container">
@@ -87,7 +108,6 @@
           </div>
         </div>
 
-        <!-- Sohbet Mesaj Giriş Alanı -->
         <div class="chat-input-area">
           <div class="chat-input-wrapper">
             <input type="text" id="chatInput" placeholder="Mesajınızı yazın..." disabled>
@@ -125,11 +145,7 @@
     </button>
   </div>
 
-  <!-- ============================================================================
-     MODALLAR (GİRİŞ, ODA OLUŞTURMA VE ŞİFRE)
-     ============================================================================ -->
-  
-  <!-- 1. Kullanıcı Giriş Modalı (Açılışta Zorunlu Aktif) -->
+  <!-- MODALLAR -->
   <div id="loginModal" class="modal-overlay active">
     <div class="modal-content">
       <h3>ChatPro'ya Katıl</h3>
@@ -142,7 +158,6 @@
     </div>
   </div>
 
-  <!-- 2. Yeni Oda Oluşturma Modalı -->
   <div id="createRoomModal" class="modal-overlay">
     <div class="modal-content">
       <h3>Yeni Oda Oluştur</h3>
@@ -162,7 +177,6 @@
     </div>
   </div>
 
-  <!-- 3. Kilitli Oda Şifre Sorulan Modal -->
   <div id="passwordModal" class="modal-overlay">
     <div class="modal-content">
       <h3>Oda Şifreli</h3>
@@ -179,7 +193,6 @@
     </div>
   </div>
 
-  <!-- BAĞLANTI SCRIPTLERI -->
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
 </body>
