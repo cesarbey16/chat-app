@@ -121,7 +121,6 @@ socket.on("rooms", (roomsList) => {
   });
 });
 
-// Oda Kurma Tetikleyicisi (İlk Kurulumda Mesaj Yazamama Hatası Çözüldü)
 document.getElementById("submitCreateRoomBtn").addEventListener("click", () => {
   const name = document.getElementById("roomNameInput").value.trim();
   const pass = document.getElementById("roomPassInput").value;
@@ -131,7 +130,6 @@ document.getElementById("submitCreateRoomBtn").addEventListener("click", () => {
     return;
   }
   
-  // Arayüzü aktifleştir ve temizle
   currentRoom = name;
   messagesContainer.innerHTML = "";
   currentRoomTitle.innerText = name;
@@ -246,7 +244,7 @@ socket.on("errorNotify", (msg) => {
 });
 
 // ============================================================================
-// WEBRTC VE CANLI YAYIN ALTYAPISI (EKO ÖNLEMELİ)
+// WEBRTC VE CANLI YAYIN ALTYAPISI (MOBİL GÜVENLİ)
 // ============================================================================
 
 startStreamBtn.addEventListener("click", async () => {
@@ -291,15 +289,14 @@ socket.on("viewerJoined", async (viewerId) => {
   socket.emit("offer", { to: viewerId, offer });
 });
 
-// YAYIN SESİ YANKI/EKO KONTROLÜ BURADA ÇÖZÜLDÜ
 socket.on("watchStream", ({ streamerId, streamerName }) => {
-  if (streamerId === socket.id) return; // Yayıncı kendisiyse izleme kanalını açmaz
+  if (streamerId === socket.id) return;
   socket.emit("watchStream", streamerId);
   streamerNameDisplay.innerText = streamerName;
 });
 
 socket.on("newStreamer", ({ streamerId, streamerName }) => {
-  if (streamerId === socket.id) return; // Yayıncı kendisiyse izleme kanalını açmaz
+  if (streamerId === socket.id) return;
   socket.emit("watchStream", streamerId);
   streamerNameDisplay.innerText = streamerName;
 });
@@ -358,16 +355,28 @@ function attachStreamToPlayer(stream, name, isLocal = false) {
   const video = document.createElement("video");
   video.id = "mainLiveVideo";
   video.autoplay = true;
-  video.playsInline = true;
-  video.srcObject = stream;
-  video.muted = isLocal; // Kendimize sesimizin yansımasını engeller
+  
+  // MOBİL OYNATMA GÜVENCELERİ (iOS & Android'in videoyu engellemesini önler)
+  video.setAttribute("playsinline", "true");
+  video.setAttribute("webkit-playsinline", "true");
+  video.muted = isLocal ? true : false; // İzleyiciler için ses açık başlamalı, yayıncı için kapalı
 
+  video.srcObject = stream;
+
+  // Çift tıklama tam ekrana geçirsin
   video.ondblclick = () => handleFullscreenToggle();
-  video.onclick = () => handleFullscreenToggle();
 
   videoTarget.appendChild(video);
   streamerNameDisplay.innerText = name;
   
+  // Tarayıcı politikaları gereği sesi açık videoyu otomatik başlatmayı garantiye alıyoruz
+  video.play().catch(() => {
+    // Eğer tarayıcı engellerse kullanıcıya tıklatarak oynatmak için bir buton/toast veya sessize alıp başlatma koruması
+    video.muted = true;
+    video.play();
+    showToast("Yayın otomatik engellendi, sesi açmak için oynatıcıyı kullanın.", "info");
+  });
+
   setTimeout(() => {
     latencyValue.innerText = Math.floor(Math.random() * 15 + 5);
   }, 1000);
@@ -380,7 +389,7 @@ function removeVideoPlayer() {
 }
 
 // ============================================================================
-// PLAYER CONTROLS
+// PLAYER CONTROLS (MOBİL DESTEKLİ TAM EKRAN LOJİĞİ)
 // ============================================================================
 
 fullscreenBtn.addEventListener("click", handleFullscreenToggle);
@@ -389,13 +398,19 @@ function handleFullscreenToggle() {
   const v = document.getElementById("mainLiveVideo");
   if (!v) return;
 
-  if (!document.fullscreenElement) {
-    videoPlayerContainer.requestFullscreen().then(() => {
-      videoPlayerContainer.classList.add("fullscreen-mode");
-    }).catch(err => console.log(err));
-  } else {
-    document.exitFullscreen();
-    videoPlayerContainer.classList.remove("fullscreen-mode");
+  // MOBİL TAM EKRAN DESTEĞİ (iOS Safari ve Android Chrome yerel oynatıcı tetikleme)
+  if (v.webkitEnterFullscreen) {
+    v.webkitEnterFullscreen();
+    return;
+  } else if (v.requestFullscreen) {
+    if (!document.fullscreenElement) {
+      videoPlayerContainer.requestFullscreen().then(() => {
+        videoPlayerContainer.classList.add("fullscreen-mode");
+      }).catch(err => console.log(err));
+    } else {
+      document.exitFullscreen();
+      videoPlayerContainer.classList.remove("fullscreen-mode");
+    }
   }
 }
 
@@ -428,7 +443,7 @@ playPauseBtn.addEventListener("click", () => {
 });
 
 // ============================================================================
-// HELPERS & GAMES
+// HELPERS, MODALS & MOBİL SEKME KONTROLÜ (TABS)
 // ============================================================================
 
 function openModal(id) {
@@ -481,4 +496,26 @@ function backToGameMenu() {
   document.getElementById("gameSelector").classList.remove("hidden");
   document.getElementById("gameStage").classList.add("hidden");
   document.getElementById("gameFrameContainer").innerHTML = "";
+}
+
+// Mobilde Odalar / Chat / Kullanıcılar arasında geçiş yapmayı sağlayan fonksiyon
+function switchTab(tabName) {
+  const sidebar = document.querySelector(".sidebar");
+  const chatSection = document.querySelector(".chat-section");
+  const usersBar = document.querySelector(".users-bar");
+  const tabs = document.querySelectorAll(".mobile-tab-btn");
+
+  // Önce her yeri gizle
+  sidebar.classList.remove("tab-active");
+  chatSection.classList.remove("tab-active");
+  usersBar.classList.remove("tab-active");
+  tabs.forEach(t => t.classList.remove("active"));
+
+  // İlgili sekmeyi aç
+  if (tabName === 'rooms') sidebar.classList.add("tab-active");
+  if (tabName === 'chat') chatSection.classList.add("tab-active");
+  if (tabName === 'users') usersBar.classList.add("tab-active");
+
+  // Buton aktifliğini değiştir
+  event.currentTarget.classList.add("active");
 }
