@@ -1,213 +1,695 @@
 // ============================================================================
-// CHATPRO - ADVANCED BACKEND SERVER (server.js)
+// CHATPRO SERVER v2.0
+// PART 1
 // ============================================================================
 
 const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+
 const app = express();
-const http = require("http").createServer(app);
-const io = require("socket.io")(http, {
-  cors: { origin: "*" }
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
 });
 
 app.use(express.static("public"));
 
-// Aktif odaların ve kullanıcıların durumunu tutan merkezi hafıza
-let rooms = {};
+const PORT = process.env.PORT || 3000;
 
-io.on("connection", (socket) => {
-  console.log(`⚡ Yeni Bağlantı: ${socket.id}`);
+// ============================================================================
+// ROOM MEMORY
+// ============================================================================
 
-  // Kullanıcı ismini kaydet
-  socket.on("setName", (name) => {
-    socket.username = name || "Misafir_" + socket.id.substring(0, 4);
-  });
+const rooms = {};
 
-  // 1. ODA OLUŞTURMA
-  socket.on("createRoom", ({ name, pass }) => {
-    if (!name) return;
-    const roomName = name.trim();
+// ============================================================================
+// ROOM HELPERS
+// ============================================================================
 
-    if (rooms[roomName]) {
-      socket.emit("errorNotify", "Bu isimde bir oda zaten mevcut.");
-      return;
-    }
+function roomExists(name){
 
-    // Gelişmiş oda yapısı
-    rooms[roomName] = {
-      pass: pass ? pass.trim() : "",
-      owner: socket.id,
-      ownerName: socket.username,
-      users: [],
-      streamer: null,
-      streamerName: null
+    return !!rooms[name];
+
+}
+
+function createRoom(name,password,ownerSocket){
+
+    rooms[name]={
+
+        name,
+
+        password:password || "",
+
+        ownerId:ownerSocket.id,
+
+        ownerName:ownerSocket.username,
+
+        streamer:null,
+
+        streamerName:null,
+
+        users:[],
+
+        createdAt:Date.now()
+
     };
 
-    console.log(`🏠 Oda Oluşturuldu: ${roomName} (Kurucu: ${socket.username})`);
-    
-    // Oluşturan kişiyi odaya otomatik sok
-    joinRoomLogic(socket, roomName, pass);
-  });
+}
 
-  // 2. ODALARI LİSTELEME
-  socket.on("getRooms", () => {
-    sendRoomsList(socket);
-  });
+function deleteRoom(name){
 
-  // 3. ODAYA KATILMA
-  socket.on("joinRoom", ({ room, username, pass }) => {
-    if (username) socket.username = username.trim();
-    joinRoomLogic(socket, room, pass);
-  });
+    if(!rooms[name]) return;
 
-  // 4. CHAT SİSTEMİ (Çift mesaj ve yönlendirme düzeltildi)
-  socket.on("chatMessage", (msg) => {
-    if (!socket.room || !msg) return;
-    const trimmedMsg = msg.trim();
-    if (trimmedMsg === "") return;
+    delete rooms[name];
 
-    // Mesajı odadaki herkese gönderiyoruz, gönderenin id'sini de ekliyoruz ki frontend sağ/sol ayırsın
-    io.to(socket.room).emit("message", {
-      id: Math.random().toString(36).substring(2, 9),
-      text: trimmedMsg,
-      user: socket.username,
-      senderId: socket.id,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    });
-  });
+    console.log("🗑 Room deleted:",name);
 
-  // 5. WEBRTC SİNYALLEŞME & CANLI YAYIN ALTYAPISI
-  socket.on("startStream", () => {
-    if (!socket.room || !rooms[socket.room]) return;
+}
 
-    rooms[socket.room].streamer = socket.id;
-    rooms[socket.room].streamerName = socket.username;
+function getRoom(name){
 
-    console.log(`📺 Yayına Başladı: ${socket.username} (Oda: ${socket.room})`);
+    return rooms[name];
 
-    // Odadaki diğer herkese yeni yayıncıyı bildir
-    socket.to(socket.room).emit("newStreamer", {
-      streamerId: socket.id,
-      streamerName: socket.username
-    });
-  });
+}
 
-  // İzleyici yayını izlemek istediğinde yayıncıya talep gönderir
-  socket.on("watchStream", (streamerId) => {
-    io.to(streamerId).emit("viewerJoined", socket.id);
-  });
+function sendRooms(){
 
-  // WebRTC El Sıkışmaları (Signaling Peer-to-Peer)
-  socket.on("offer", ({ to, offer }) => {
-    io.to(to).emit("offer", { from: socket.id, offer });
-  });
+    const list=Object.values(rooms).map(room=>({
 
-  socket.on("answer", ({ to, answer }) => {
-    io.to(to).emit("answer", { from: socket.id, answer });
-  });
+        name:room.name,
 
-  socket.on("candidate", ({ to, candidate }) => {
-    io.to(to).emit("candidate", { from: socket.id, candidate });
-  });
+        users:room.users.length,
 
-  // 6. BAĞLANTI KOPMA (DISCONNECT) YÖNETİMİ
-  socket.on("disconnect", () => {
-    console.log(`❌ Bağlantı Koptu: ${socket.id}`);
-    
-    if (socket.room && rooms[socket.room]) {
-      const roomName = socket.room;
-      const r = rooms[roomName];
+        locked:room.password!=="",
 
-      // Kullanıcıyı listeden çıkar
-      r.users = r.users.filter(u => u.id !== socket.id);
+        hasStream:room.streamer!==null,
 
-      // Eğer yayıncı odadan çıktıysa yayını sonlandır
-      if (r.streamer === socket.id) {
-        r.streamer = null;
-        r.streamerName = null;
-        io.to(roomName).emit("streamEnded");
-      }
+        owner:room.ownerName
 
-      // Eğer odada kimse kalmadıysa odayı tamamen sil
-      if (r.users.length === 0) {
-        console.log(`🗑️ Oda Boşaldığı İçin Silindi: ${roomName}`);
-        delete rooms[roomName];
-      } else {
-        // Eğer odayı kuran çıktıysa yeni bir admin ata
-        if (r.owner === socket.id && r.users.length > 0) {
-          r.owner = r.users[0].id;
-          r.ownerName = r.users[0].name;
-        }
-        // Güncel kullanıcı listesini odaya duyur
-        io.to(roomName).emit("users", {
-          users: r.users,
-          ownerId: r.owner
-        });
-      }
-
-      sendRoomsList();
-    }
-  });
-
-  // Odaya katılma ortak mantığı
-  function joinRoomLogic(currentSocket, roomName, password) {
-    const r = rooms[roomName];
-    if (!r) {
-      currentSocket.emit("errorNotify", "Oda bulunamadı.");
-      return;
-    }
-
-    if (r.pass && r.pass !== password) {
-      currentSocket.emit("errorNotify", "Hatalı oda şifresi!");
-      return;
-    }
-
-    // Eğer kullanıcı zaten bir odadaysa önce oradan çıkar
-    if (currentSocket.room) {
-      currentSocket.leave(currentSocket.room);
-    }
-
-    currentSocket.join(roomName);
-    currentSocket.room = roomName;
-
-    // Kullanıcıyı odaya ekle
-    r.users.push({ id: currentSocket.id, name: currentSocket.username });
-
-    // Odadakilere güncel kullanıcıları ve oda sahibini at
-    io.to(roomName).emit("users", {
-      users: r.users,
-      ownerId: r.owner
-    });
-
-    // Eğer odada aktif bir yayın varsa, yeni giren kişiye yayıncı bilgisini gönder (Sonradan girme fix!)
-    if (r.streamer) {
-      currentSocket.emit("watchStream", {
-        streamerId: r.streamer,
-        streamerName: r.streamerName
-      });
-    }
-
-    // Global oda listesini güncelle
-    sendRoomsList();
-  }
-
-  // Tüm sunucuya ya da hedef kişiye odaları gönderen fonksiyon
-  function sendRoomsList(target) {
-    const data = Object.keys(rooms).map(r => ({
-      name: r,
-      count: rooms[r].users.length,
-      locked: rooms[r].pass !== "",
-      hasStream: rooms[r].streamer !== null
     }));
 
-    if (target) {
-      target.emit("rooms", data);
-    } else {
-      io.emit("rooms", data);
-    }
-  }
+    io.emit("rooms",list);
+
+}
+
+function addUser(roomName,socket){
+
+    const room=getRoom(roomName);
+
+    if(!room) return;
+
+    room.users=room.users.filter(u=>u.id!==socket.id);
+
+    room.users.push({
+
+        id:socket.id,
+
+        name:socket.username,
+
+        joined:Date.now()
+
+    });
+
+}
+
+function removeUser(roomName,id){
+
+    const room=getRoom(roomName);
+
+    if(!room) return;
+
+    room.users=room.users.filter(
+
+        u=>u.id!==id
+
+    );
+
+}
+
+function sendUsers(roomName){
+
+    const room=getRoom(roomName);
+
+    if(!room) return;
+
+    io.to(roomName).emit("users",{
+
+        users:room.users,
+
+        ownerId:room.ownerId,
+
+        streamerId:room.streamer
+
+    });
+
+}
+
+// ============================================================================
+// SOCKET CONNECTION
+// ============================================================================
+
+io.on("connection",(socket)=>{
+
+    console.log("⚡ Connected:",socket.id);
+
+    socket.username="Misafir_"+socket.id.substring(0,4);
+
+    socket.room=null;
+
+// ============================================================================
+// USER NAME
+// ============================================================================
+
+socket.on("setName",(name)=>{
+
+    if(!name) return;
+
+    socket.username=name.trim();
+
 });
 
-const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => {
-  console.log(`🚀 ChatPro Sunucusu http://localhost:${PORT} adresinde aktif!`);
+// ============================================================================
+// CREATE ROOM
+// ============================================================================
+
+socket.on("createRoom",({name,password})=>{
+
+    if(!name) return;
+
+    name=name.trim();
+
+    if(roomExists(name)){
+
+        socket.emit(
+
+            "errorNotify",
+
+            "Bu oda zaten var."
+
+        );
+
+        return;
+
+    }
+
+    createRoom(
+
+        name,
+
+        password,
+
+        socket
+
+    );
+
+    joinRoom(
+
+        socket,
+
+        name,
+
+        password
+
+    );
+
+});
+// ============================================================================
+// JOIN ROOM
+// ============================================================================
+
+function joinRoom(socket, roomName, password = "") {
+
+    const room = getRoom(roomName);
+
+    if (!room) {
+        socket.emit("errorNotify", "Oda bulunamadı.");
+        return;
+    }
+
+    if (room.password !== "" && room.password !== password) {
+        socket.emit("errorNotify", "Oda şifresi yanlış.");
+        return;
+    }
+
+    // Eski odadan çık
+    if (socket.room && rooms[socket.room]) {
+
+        leaveRoom(socket);
+
+    }
+
+    socket.join(roomName);
+
+    socket.room = roomName;
+
+    addUser(roomName, socket);
+
+    sendUsers(roomName);
+
+    sendRooms();
+
+    console.log(
+        "✅",
+        socket.username,
+        "katıldı ->",
+        roomName
+    );
+
+    // Sonradan girenler yayını görebilsin
+
+    if (room.streamer) {
+
+        socket.emit("watchStream", {
+
+            streamerId: room.streamer,
+
+            streamerName: room.streamerName
+
+        });
+
+        io.to(room.streamer).emit(
+
+            "viewerJoined",
+
+            socket.id
+
+        );
+
+    }
+
+}
+
+// ============================================================================
+// LEAVE ROOM
+// ============================================================================
+
+function leaveRoom(socket) {
+
+    if (!socket.room) return;
+
+    const roomName = socket.room;
+
+    const room = rooms[roomName];
+
+    if (!room) {
+
+        socket.room = null;
+
+        return;
+
+    }
+
+    removeUser(
+
+        roomName,
+
+        socket.id
+
+    );
+
+    socket.leave(roomName);
+
+    // Yayıncı çıktıysa
+
+    if (room.streamer === socket.id) {
+
+        room.streamer = null;
+
+        room.streamerName = null;
+
+        io.to(roomName).emit("streamEnded");
+
+        io.to(roomName).emit("closePeer");
+
+    }
+
+    // Oda sahibi çıktıysa
+
+    if (room.ownerId === socket.id) {
+
+        if (room.users.length > 0) {
+
+            room.ownerId = room.users[0].id;
+
+            room.ownerName = room.users[0].name;
+
+            io.to(roomName).emit("newOwner", {
+
+                id: room.ownerId,
+
+                name: room.ownerName
+
+            });
+
+        }
+
+    }
+
+    // Oda boşaldıysa sil
+
+    if (room.users.length === 0) {
+
+        deleteRoom(roomName);
+
+    } else {
+
+        sendUsers(roomName);
+
+    }
+
+    sendRooms();
+
+    socket.room = null;
+
+}
+
+// ============================================================================
+// JOIN ROOM EVENT
+// ============================================================================
+
+socket.on("joinRoom", ({ room, username, password }) => {
+
+    if (username) {
+
+        socket.username = username.trim();
+
+    }
+
+    joinRoom(
+
+        socket,
+
+        room,
+
+        password
+
+    );
+
+});
+// ============================================================================
+// CHAT
+// ============================================================================
+
+socket.on("chatMessage",(msg)=>{
+
+    if(!socket.room) return;
+
+    if(typeof msg!=="string") return;
+
+    msg=msg.trim();
+
+    if(msg.length===0) return;
+
+    io.to(socket.room).emit("message",{
+
+        id:Date.now()+"_"+Math.random(),
+
+        user:socket.username,
+
+        senderId:socket.id,
+
+        text:msg,
+
+        time:new Date().toLocaleTimeString("tr-TR",{
+
+            hour:"2-digit",
+            minute:"2-digit"
+
+        })
+
+    });
+
+});
+
+// ============================================================================
+// START STREAM
+// ============================================================================
+
+socket.on("startStream",()=>{
+
+    if(!socket.room) return;
+
+    const room=getRoom(socket.room);
+
+    if(!room) return;
+
+    room.streamer=socket.id;
+
+    room.streamerName=socket.username;
+
+    room.streamTime=Date.now();
+
+    socket.to(socket.room).emit("newStreamer",{
+
+        streamerId:socket.id,
+
+        streamerName:socket.username
+
+    });
+
+    sendRooms();
+
+    console.log("📺 Stream başladı:",socket.username);
+
+});
+
+// ============================================================================
+// STOP STREAM
+// ============================================================================
+
+socket.on("stopStream",()=>{
+
+    if(!socket.room) return;
+
+    const room=getRoom(socket.room);
+
+    if(!room) return;
+
+    if(room.streamer!==socket.id) return;
+
+    room.streamer=null;
+
+    room.streamerName=null;
+
+    room.streamTime=null;
+
+    io.to(socket.room).emit("streamEnded");
+
+    io.to(socket.room).emit("closePeer");
+
+    sendRooms();
+
+});
+
+// ============================================================================
+// WATCH STREAM
+// ============================================================================
+
+socket.on("watchStream",(streamerId)=>{
+
+    if(!streamerId) return;
+
+    if(streamerId===socket.id) return;
+
+    io.to(streamerId).emit(
+
+        "viewerJoined",
+
+        socket.id
+
+    );
+
+});
+
+// ============================================================================
+// OFFER
+// ============================================================================
+
+socket.on("offer",({to,offer})=>{
+
+    if(!to) return;
+
+    io.to(to).emit("offer",{
+
+        from:socket.id,
+
+        offer
+
+    });
+
+});
+
+// ============================================================================
+// ANSWER
+// ============================================================================
+
+socket.on("answer",({to,answer})=>{
+
+    if(!to) return;
+
+    io.to(to).emit("answer",{
+
+        from:socket.id,
+
+        answer
+
+    });
+
+});
+
+// ============================================================================
+// ICE
+// ============================================================================
+
+socket.on("candidate",({to,candidate})=>{
+
+    if(!to) return;
+
+    io.to(to).emit("candidate",{
+
+        from:socket.id,
+
+        candidate
+
+    });
+
+});
+  // ============================================================================
+// DISCONNECT
+// ============================================================================
+
+socket.on("disconnect", () => {
+
+    console.log("❌ Disconnect:", socket.username);
+
+    leaveRoom(socket);
+
+});
+
+// ============================================================================
+// PING
+// ============================================================================
+
+socket.on("pingServer", () => {
+
+    socket.emit("pongServer", Date.now());
+
+});
+
+// ============================================================================
+// SERVER INFO
+// ============================================================================
+
+socket.on("getServerInfo", () => {
+
+    socket.emit("serverInfo", {
+
+        rooms: Object.keys(rooms).length,
+
+        users: Object.values(rooms).reduce(
+            (a, r) => a + r.users.length,
+            0
+        ),
+
+        uptime: process.uptime()
+
+    });
+
+});
+
+// ============================================================================
+// FORCE ROOM UPDATE
+// ============================================================================
+
+socket.on("refreshRooms", () => {
+
+    sendRooms();
+
+});
+
+// ============================================================================
+// FORCE USER UPDATE
+// ============================================================================
+
+socket.on("refreshUsers", () => {
+
+    if (!socket.room) return;
+
+    sendUsers(socket.room);
+
+});
+
+// ============================================================================
+// END CONNECTION
+// ============================================================================
+
+});
+
+// ============================================================================
+// AUTO CLEANUP
+// ============================================================================
+
+setInterval(() => {
+
+    Object.keys(rooms).forEach(roomName => {
+
+        const room = rooms[roomName];
+
+        if (!room) return;
+
+        room.users = room.users.filter(u => {
+
+            return io.sockets.sockets.has(u.id);
+
+        });
+
+        if (room.users.length === 0) {
+
+            console.log("🗑 Auto delete:", roomName);
+
+            delete rooms[roomName];
+
+        }
+
+    });
+
+    sendRooms();
+
+}, 30000);
+
+// ============================================================================
+// ERROR HANDLER
+// ============================================================================
+
+process.on("uncaughtException", err => {
+
+    console.error("UNCAUGHT:", err);
+
+});
+
+process.on("unhandledRejection", err => {
+
+    console.error("PROMISE:", err);
+
+});
+
+// ============================================================================
+// START SERVER
+// ============================================================================
+
+server.listen(PORT, () => {
+
+    console.log("");
+    console.log("======================================");
+    console.log("🚀 ChatPro Server Started");
+    console.log("🌐 http://localhost:" + PORT);
+    console.log("======================================");
+    console.log("");
+
 });
