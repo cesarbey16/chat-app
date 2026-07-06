@@ -13,7 +13,7 @@ let isMuted = false;
 
 const iceConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
-// DOMELEMENTLERİ
+// DOM ELEMENTLERİ
 const loginModal = document.getElementById("loginModal");
 const usernameInput = document.getElementById("usernameInput");
 const loginBtn = document.getElementById("loginBtn");
@@ -153,7 +153,6 @@ document.getElementById("submitCreateRoomBtn").addEventListener("click", () => {
   document.getElementById("roomNameInput").value = "";
   document.getElementById("roomPassInput").value = "";
 
-  // Mobilde oda kurunca direkt chat alanına geçiş yap ki kullanıcı rahat etsin
   if (window.innerWidth <= 768) {
     setTimeout(() => {
       const chatBtn = document.querySelector(".mobile-tab-btn[onclick*='chat']");
@@ -184,7 +183,6 @@ function handleJoinRoom(roomName, pass) {
 
   socket.emit("joinRoom", { room: roomName, username: myUsername, pass });
 
-  // Mobilde odaya katılınca direkt mesajlar sekmesine aktar
   if (window.innerWidth <= 768) {
     setTimeout(() => {
       const chatBtn = document.querySelector(".mobile-tab-btn[onclick*='chat']");
@@ -243,12 +241,7 @@ socket.on("message", (msg) => {
   if (welcomeBox) welcomeBox.remove();
 
   const msgRow = document.createElement("div");
-  
-  if (msg.senderId === socket.id) {
-    msgRow.className = "message-row msg-me";
-  } else {
-    msgRow.className = "message-row msg-other";
-  }
+  msgRow.className = (msg.senderId === socket.id) ? "message-row msg-me" : "message-row msg-other";
 
   msgRow.innerHTML = `
     <div class="message-bubble">
@@ -268,7 +261,7 @@ socket.on("errorNotify", (msg) => {
 });
 
 // ============================================================================
-// WEBRTC VE CANLI YAYIN ALTYAPISI (MOBİL GÜVENLİ)
+// WEBRTC VE CANLI YAYIN ALTYAPISI (YANKI ENGELLEMELİ)
 // ============================================================================
 
 startStreamBtn.addEventListener("click", async () => {
@@ -383,11 +376,7 @@ function attachStreamToPlayer(stream, name, isLocal = false) {
   video.setAttribute("playsinline", "true");
   video.setAttribute("webkit-playsinline", "true");
 
-  // ==========================================
-  // YANKI ENGELLEME KİLİDİ (MUTED CONTROL)
-  // ==========================================
-  // Eğer yayını açan bendeysem (isLocal === true), kendi sesimi duymamalıyım.
-  // Eğer isLocal true olmasına rağmen ses açık kalırsa mikrofon hoparlörden çıkan sesi tekrar yakalar ve yankı yapar.
+  // YANKI ENGELLEME KONTROLÜ
   if (isLocal || name === myUsername) {
     video.muted = true; 
     video.volume = 0;
@@ -403,7 +392,6 @@ function attachStreamToPlayer(stream, name, isLocal = false) {
   streamerNameDisplay.innerText = name;
   
   video.play().catch(() => {
-    // Tarayıcı politikası gereği otomatik oynama engellenirse izleyiciler için sessiz başlatıp uyarı veriyoruz
     if (!isLocal && name !== myUsername) {
       video.muted = true;
       video.play();
@@ -423,7 +411,7 @@ function removeVideoPlayer() {
 }
 
 // ============================================================================
-// PLAYER CONTROLS (TAM EKRAN LOJİĞİ)
+// PLAYER CONTROLS (PLAYER KONTROLLERİ)
 // ============================================================================
 
 fullscreenBtn.addEventListener("click", handleFullscreenToggle);
@@ -479,13 +467,9 @@ playPauseBtn.addEventListener("click", () => {
 // HELPERS, MODALS & MOBİL SEKME KONTROLÜ (TABS)
 // ============================================================================
 
-function openModal(id) {
-  document.getElementById(id).classList.add("active");
-}
-
-function closeModal(id) {
-  document.getElementById(id).classList.remove("active");
-}
+function openModal(id) { document.getElementById(id).classList.add("active"); }
+// İlgili event'i yakalamak için parametre ekledik
+function closeModal(id) { document.getElementById(id).classList.remove("active"); }
 
 function showToast(message, type = "info") {
   const container = document.getElementById("toastContainer");
@@ -513,19 +497,65 @@ function switchTab(tabName) {
 
   if (!sidebar || !chatSection || !usersBar) return;
 
-  // Önce her yeri gizle
   sidebar.classList.remove("tab-active");
   chatSection.classList.remove("tab-active");
   usersBar.classList.remove("tab-active");
   tabs.forEach(t => t.classList.remove("active"));
 
-  // İlgili sekmeyi aç
   if (tabName === 'rooms') sidebar.classList.add("tab-active");
   if (tabName === 'chat') chatSection.classList.add("tab-active");
   if (tabName === 'users') usersBar.classList.add("tab-active");
 
-  // Buton aktifliğini değiştir
-  if (event && event.currentTarget) {
-    event.currentTarget.classList.add("active");
+  if (window.event && window.event.currentTarget) {
+    window.event.currentTarget.classList.add("active");
   }
+}
+
+// ============================================================================
+// OYUN PANELİ VE DINO ENJEKSİYON SİSTEMİ (KLASÖR AYARLI)
+// ============================================================================
+
+function launchGame(gameType) {
+  const gameStage = document.getElementById("gameStage");
+  const gameFrameContainer = document.getElementById("gameFrameContainer");
+  const videoPlayerContainer = document.getElementById("videoPlayerContainer");
+
+  if (!gameStage || !gameFrameContainer) return;
+
+  if (videoPlayerContainer && !videoPlayerContainer.classList.contains("hidden")) {
+    videoPlayerContainer.classList.add("hidden");
+  }
+
+  gameStage.classList.remove("hidden");
+  gameFrameContainer.innerHTML = "";
+
+  if (gameType === 'dino') {
+    const iframe = document.createElement("iframe");
+    iframe.src = "/game/index.html"; // Doğru /game/ yolu ayarlandı
+    iframe.style.width = "100%";
+    iframe.style.height = "350px"; 
+    iframe.style.border = "none";
+    iframe.style.borderRadius = "8px";
+    iframe.style.backgroundColor = "#fff"; 
+    
+    gameFrameContainer.appendChild(iframe);
+    showToast("Dino Oyunu Modu Aktif!", "success");
+  }
+
+  if (window.innerWidth <= 768) {
+    setTimeout(() => {
+      const chatBtn = document.querySelector(".mobile-tab-btn[onclick*='chat']");
+      if (chatBtn) chatBtn.click();
+    }, 100);
+  }
+}
+
+function backToGameMenu() {
+  const gameStage = document.getElementById("gameStage");
+  const gameFrameContainer = document.getElementById("gameFrameContainer");
+  
+  if (gameStage) gameStage.classList.add("hidden");
+  if (gameFrameContainer) gameFrameContainer.innerHTML = "";
+  
+  showToast("Oyun kapatıldı.", "info");
 }
