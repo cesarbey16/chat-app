@@ -1,6 +1,3 @@
-/* ============================================================================
-   CHATPRO GLOBAL CORE STYLES & CORE DESIGN VARIABLES
-   ============================================================================ */
 :root {
   --bg-color: #0b0e14;
   --surface-color: #151a24;
@@ -51,9 +48,7 @@ body {
   position: relative;
 }
 
-/* ============================================================================
-   SIDEBAR (ROOMS & GAMES SECTION)
-   ============================================================================ */
+/* SIDEBAR */
 .sidebar {
   width: 280px;
   min-width: 280px;
@@ -185,7 +180,7 @@ body {
   animation: pulse 1.5s infinite;
 }
 
-/* Oyun Seçim Tasarımları */
+/* OYUN PANELİ TASARIMI */
 .game-selector-box {
   background-color: var(--bg-color);
   border: 1px solid var(--border-color);
@@ -229,9 +224,7 @@ body {
   border-color: var(--primary-color);
 }
 
-/* ============================================================================
-   MAIN CONTENT AREA (VIDEO PLAYER & GAME STAGE)
-   ============================================================================ */
+/* MERKEZİ ALAN VE PLAYER */
 .main-content {
   flex: 1;
   display: flex;
@@ -291,7 +284,6 @@ body {
   display: none !important;
 }
 
-/* Video Section */
 .video-section {
   padding: 15px;
   display: flex;
@@ -321,7 +313,7 @@ body {
   object-fit: contain;
 }
 
-/* Oyun Oynama Ekranı Tasarımı */
+/* OYUN SAHNESİ KAPSAYICISI */
 .game-stage-container {
   padding: 15px;
   background-color: var(--surface-color);
@@ -355,7 +347,7 @@ body {
   overflow: hidden;
 }
 
-/* Custom Video Controls */
+/* PLAYER OVERLAY CONTROLS */
 .player-controls-overlay {
   position: absolute;
   bottom: 0;
@@ -403,9 +395,7 @@ body {
   color: #fff;
 }
 
-/* ============================================================================
-   CHAT SECTION & CHAT BUBBLES
-   ============================================================================ */
+/* SOHBET SİSTEMİ */
 .chat-section {
   flex: 1;
   display: flex;
@@ -428,13 +418,8 @@ body {
   width: 100%;
 }
 
-.msg-me {
-  justify-content: flex-end;
-}
-
-.msg-other {
-  justify-content: flex-start;
-}
+.msg-me { justify-content: flex-end; }
+.msg-other { justify-content: flex-start; }
 
 .message-bubble {
   max-width: 70%;
@@ -467,18 +452,9 @@ body {
   gap: 8px;
 }
 
-.msg-me .msg-user-meta {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.msg-other .msg-user-meta {
-  color: var(--accent-color);
-}
-
-.msg-timestamp {
-  font-weight: 400;
-  opacity: 0.6;
-}
+.msg-me .msg-user-meta { color: rgba(255, 255, 255, 0.9); }
+.msg-other .msg-user-meta { color: var(--accent-color); }
+.msg-timestamp { font-weight: 400; opacity: 0.6; }
 
 .chat-input-area {
   padding: 15px 20px;
@@ -531,9 +507,7 @@ body {
   transition: background 0.2s;
 }
 
-.btn-send:hover {
-  background-color: var(--primary-hover);
-}
+.btn-send:hover { background-color: var(--primary-hover); }
 
 .welcome-box {
   display: flex;
@@ -552,9 +526,7 @@ body {
   margin-bottom: 15px;
 }
 
-/* ============================================================================
-   USERS BAR (RIGHT ASIDE)
-   ============================================================================ */
+/* KULLANICI BARBARI */
 .users-bar {
   width: 240px;
   min-width: 240px;
@@ -584,12 +556,7 @@ body {
   border: 1px solid var(--border-color);
 }
 
-.user-card-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-}
+.user-card-left { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
 
 .user-avatar-mini {
   width: 24px;
@@ -612,9 +579,7 @@ body {
   color: white;
 }
 
-/* ============================================================================
-   MODALS & TOAST NOTIFICATIONS
-   ============================================================================ */
+/* MODALS & TOASTS */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -632,10 +597,7 @@ body {
   transition: opacity 0.3s;
 }
 
-.modal-overlay.active {
-  opacity: 1;
-  pointer-events: auto;
-}
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
 
 .modal-content {
   background-color: var(--surface-color);
@@ -648,125 +610,30 @@ body {
   text-align: center;
 }
 
-.modal-content h3 {
-  margin-bottom: 10px;
-  font-size: 1.4rem;
-}
+.modal-content h3 { margin-bottom: 10px; font-size: 1.4rem; }
+.modal-content p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px; }
 
-.modal-content p {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  margin-bottom: 20px;
-}
+.form-group { margin-bottom: 20px; text-align: left; }
+.form-group label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px; color: var(--text-muted); text-transform: uppercase; }
+.form-group input { width: 100%; background-color: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-color); padding: 12px; border-radius: 8px; outline: none; }
+.modal-buttons { display: flex; gap: 10px; justify-content: flex-end; }
+.btn-secondary { background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); padding: 10px 20px; border-radius: 8px; cursor: pointer; }
 
-.form-group {
-  margin-bottom: 20px;
-  text-align: left;
-}
-
-.form-group label {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 700;
-  margin-bottom: 6px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-}
-
-.form-group input {
-  width: 100%;
-  background-color: var(--bg-color);
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  padding: 12px;
-  border-radius: 8px;
-  outline: none;
-}
-
-.modal-buttons {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.btn-secondary {
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid var(--border-color);
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.toast-container {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 999999;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.toast {
-  background-color: var(--toast-bg);
-  border-left: 4px solid var(--primary-color);
-  color: var(--text-color);
-  padding: 12px 20px;
-  border-radius: 6px;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-  font-size: 0.9rem;
-  font-weight: 500;
-  min-width: 250px;
-  transition: opacity 0.3s;
-}
-
+.toast-container { position: fixed; top: 20px; right: 20px; z-index: 999999; display: flex; flex-direction: column; gap: 10px; }
+.toast { background-color: var(--toast-bg); border-left: 4px solid var(--primary-color); color: var(--text-color); padding: 12px 20px; border-radius: 6px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); font-size: 0.9rem; font-weight: 500; min-width: 250px; transition: opacity 0.3s; }
 .toast-error { border-left-color: var(--error-color); }
 .toast-success { border-left-color: var(--success-color); }
 
-@keyframes pulse {
-  0% { opacity: 0.6; }
-  50% { opacity: 1; }
-  100% { opacity: 0.6; }
-}
+@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
 
-/* ============================================================================
-   ULTRA MOBILE OPTIMIZATIONS WITH TAB SYSTEM (CSS PREMIUM)
-   ============================================================================ */
+/* MOBİL OPTİMİZASYONLAR VE TAB SİSTEMİ */
 @media (max-width: 768px) {
-  .app-container {
-    flex-direction: column;
-    height: 100vh;
-    padding-bottom: 60px;
-    overflow: hidden;
-  }
-
-  .main-content {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  .video-section {
-    padding: 5px;
-    background: #000;
-  }
-
-  .video-player-container {
-    height: 190px;
-    border-radius: 0;
-  }
-
-  .video-player-container.fullscreen-mode {
-    height: 100% !important;
-    max-width: 100% !important;
-  }
-
-  /* Oyun Alanı Mobilde Küçük Ekranlara Sığsın */
-  .game-stage-container {
-    padding: 8px;
-  }
+  .app-container { flex-direction: column; height: 100vh; padding-bottom: 60px; overflow: hidden; }
+  .main-content { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+  .video-section { padding: 5px; background: #000; }
+  .video-player-container { height: 190px; border-radius: 0; }
+  .video-player-container.fullscreen-mode { height: 100% !important; max-width: 100% !important; }
+  .game-stage-container { padding: 8px; }
 
   .sidebar, .chat-section, .users-bar {
     display: none !important; 
@@ -777,55 +644,15 @@ body {
     overflow-y: auto !important;
   }
 
-  .sidebar.tab-active, .chat-section.tab-active, .users-bar.tab-active {
-    display: flex !important;
-  }
-
-  .sidebar {
-    padding: 15px;
-    border-right: none;
-  }
-
-  .rooms-list-wrapper {
-    padding: 0;
-  }
-
-  .rooms-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-height: 100%;
-    overflow-y: auto;
-  }
-
-  .room-item {
-    width: 100%;
-    padding: 15px;
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
-  }
-
-  .chat-section {
-    flex-direction: column;
-  }
-
-  .messages-container {
-    flex: 1;
-    padding: 15px;
-    overflow-y: auto;
-    max-height: calc(100vh - 320px);
-  }
-
-  .chat-input-area {
-    padding: 10px;
-    background: var(--bg-color);
-    border-top: 1px solid var(--border-color);
-  }
-
-  .modal-content {
-    width: 95% !important;
-    padding: 20px;
-  }
+  .sidebar.tab-active, .chat-section.tab-active, .users-bar.tab-active { display: flex !important; }
+  .sidebar { padding: 15px; border-right: none; }
+  .rooms-list-wrapper { padding: 0; }
+  .rooms-list { display: flex; flex-direction: column; gap: 10px; max-height: 100%; overflow-y: auto; }
+  .room-item { width: 100%; padding: 15px; background: var(--surface-color); border: 1px solid var(--border-color); }
+  .chat-section { flex-direction: column; }
+  .messages-container { flex: 1; padding: 15px; overflow-y: auto; max-height: calc(100vh - 320px); }
+  .chat-input-area { padding: 10px; background: var(--bg-color); border-top: 1px solid var(--border-color); }
+  .modal-content { width: 95% !important; padding: 20px; }
 
   .mobile-navigation-bar {
     position: fixed;
@@ -842,33 +669,12 @@ body {
   }
 
   .mobile-tab-btn {
-    background: none;
-    border: none;
-    color: #888;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    gap: 4px;
-    cursor: pointer;
-    flex: 1;
-    height: 100%;
-    transition: color 0.2s;
+    background: none; border: none; color: #888; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; gap: 4px; cursor: pointer; flex: 1; height: 100%; transition: color 0.2s;
   }
-
-  .mobile-tab-btn i {
-    font-size: 18px;
-  }
-
-  .mobile-tab-btn.active {
-    color: var(--primary-color);
-    font-weight: bold;
-  }
+  .mobile-tab-btn i { font-size: 18px; }
+  .mobile-tab-btn.active { color: var(--primary-color); font-weight: bold; }
 }
 
 @media (min-width: 769px) {
-  .mobile-navigation-bar {
-    display: none !important;
-  }
+  .mobile-navigation-bar { display: none !important; }
 }
